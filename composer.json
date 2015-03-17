@@ -1,0 +1,30 @@
+{
+    "name": "heureka/php-rq",
+    "description": "Several simple and reliable queues based on Redis",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Chábek",
+            "email": "jakub.chabek@heureka.cz"
+        },
+        {
+            "name": "Heureka"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0",
+        "predis/predis": "~1.0.0"
+    },
+    "bin": [
+        "php-rq-run-tests"
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "~4.4.0",
+        "nette/finder": "~2.2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpRQ\\": ["src/", "tests"]
+        }
+    }
+}

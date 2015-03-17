@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+$host = getenv('REDIS_HOST');
+$db = getenv('REDIS_DB');
+$port = getenv('REDIS_PORT');
+$password = getenv('REDIS_PASSWORD');
+
+if ($host === false || $db === false) {
+    echo "\nYou must set ENV variables REDIS_HOST and REDIS_DB to run the tests\n\n";
+    exit(1);
+}
+
+$config = [
+    'host'     => $host,
+    'database' => $db,
+    'port'     => $port === false ? 6379 : $port,
+];
+
+if ($password !== false) {
+    $config['password'] = $password;
+}
+
+try {
+    $redis = new PhpRQ\Client($config);
+    $redis->ping();
+} catch (\Predis\Response\ServerException $e) {
+    if ($e->getMessage() === 'NOAUTH Authentication required.') {
+        echo "\nYour server requires authentication - please supply it via ENV variable REDIS_PASSWORD\n\n";
+        exit(1);
+    }
+
+    throw $e;
+}
+
+\PhpRQ\PhpRQTest::$redis = $redis;
+
+$phpUnit = new PHPUnit_TextUI_Command;
+$phpUnit->run([__FILE__, 'PhpRQ\PhpRQTest', __DIR__ . '/tests/PhpRQTest.php']);
