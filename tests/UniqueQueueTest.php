@@ -42,26 +42,21 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertKeys(['test', 'test-unique']);
     }
 
-    public function testAddItemEmpty()
+    /**
+     * @dataProvider providerAddItemsEmpty
+     */
+    public function testAddItemEmpty($invalidItem = null)
     {
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new Queue($this->redis, 'test');
+        $queue->addItem(1);
 
         try {
-            $queue->addItem('');
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $queue->addItem($invalidItem);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
 
-        try {
-            $queue->addItem(null);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $queue->addItem(0);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        $this->assertKeys([]);
+        $this->assertSame(['1'], $this->redis->lrange('test', 0, 5));
+        $this->assertKeys(['test']);
     }
 
     public function testAddItems()
@@ -81,26 +76,24 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertKeys(['test', 'test-unique']);
     }
 
-    public function testAddItemsEmpty()
+    /**
+     * @dataProvider providerAddItemsEmpty
+     */
+    public function testAddItemsEmpty($emptyItem = null)
     {
         $queue = new UniqueQueue($this->redis, 'test');
 
         try {
-            $queue->addItems([1, '', 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $queue->addItems([1, null, 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $queue->addItems([1, 0, 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $queue->addItems([1, $emptyItem, 5]);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
 
         $this->assertKeys([]);
+    }
+
+    public function providerAddItemsEmpty()
+    {
+        return ['', null, 0, false];
     }
 
     public function testGetItems()
@@ -125,29 +118,22 @@ class UniqueQueueTest extends BaseTestCase
         ]);
     }
 
-    public function testGetItemsInvalid()
+    /**
+     * @dataProvider providerGetItemsInvalid
+     */
+    public function testGetItemsInvalid($count = null)
     {
         $queue = new UniqueQueue($this->redis, 'test');
 
         try {
-            $queue->getItems(0);
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $queue->getItems($count);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
+    }
 
-        try {
-            $queue->getItems(-5);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $queue->getItems('');
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $queue->getItems(null);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
+    public function providerGetItemsInvalid()
+    {
+        return [0, -5, '', null, false];
     }
 
     public function testGetAllItems()

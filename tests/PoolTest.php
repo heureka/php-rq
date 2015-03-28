@@ -70,53 +70,54 @@ class PoolTest extends BaseTestCase
         $this->assertKeys(['test']);
     }
 
-    public function testAddItemEmpty()
+    /**
+     * @dataProvider providerAddItemsEmpty
+     */
+    public function testAddItemEmpty($emptyItem = null)
     {
         $pool = new Pool($this->redis, 'test');
+        $pool->addItem(1);
 
         try {
-            $pool->addItem('');
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $pool->addItem($emptyItem);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
 
-        try {
-            $pool->addItem('');
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
+        $this->assertSame(['1'], $this->redis->zrange('test', 0, 5));
+        $this->assertKeys(['test']);
+    }
 
-        try {
-            $pool->addItem(null);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
+    public function testAddItems()
+    {
+        $time = time();
+        $pool = new Pool($this->redis, 'test');
+        $pool->addItems([1, 3, 5, 3]);
+        $pool->addItems([3, 6]);
 
+        $this->assertSame(
+            array_fill_keys(['1', '3', '5', '6'], (string)$time),
+            $this->redis->zrange('test', 0, 5, 'WITHSCORES')
+        );
+        $this->assertKeys(['test']);
+    }
+
+    /**
+     * @dataProvider providerAddItemsEmpty
+     */
+    public function testAddItemsEmpty($emptyItem = null)
+    {
+        $pool = new Pool($this->redis, 'test');
         try {
-            $pool->addItem(0);
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $pool->addItems([1, $emptyItem, 5]);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
 
         $this->assertKeys([]);
     }
 
-    public function testAddItemsEmpty()
+    public function providerAddItemsEmpty()
     {
-        $pool = new Pool($this->redis, 'test');
-
-        try {
-            $pool->addItems([1, '', 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $pool->addItems([1, null, 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $pool->addItems([1, 0, 5]);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        $this->assertKeys([]);
+        return ['', null, 0, false];
     }
 
     public function testGetItems()
@@ -143,29 +144,21 @@ class PoolTest extends BaseTestCase
         $this->assertKeys(['test']);
     }
 
-    public function testGetItemsInvalid()
+    /**
+     * @dataProvider providerGetItemsInvalid
+     */
+    public function testGetItemsInvalid($count = null)
     {
         $pool = new Pool($this->redis, 'test');
-
         try {
-            $pool->getItems(0);
-            $this->fail('Expected InvalidArgumentException to be thrown');
+            $pool->getItems($count);
+            $this->fail('Expected \PhpRQ\Exception\InvalidArgument to be thrown');
         } catch (Exception\InvalidArgument $e) {}
+    }
 
-        try {
-            $pool->getItems(-5);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $pool->getItems('');
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
-
-        try {
-            $pool->getItems(null);
-            $this->fail('Expected InvalidArgumentException to be thrown');
-        } catch (Exception\InvalidArgument $e) {}
+    public function providerGetItemsInvalid()
+    {
+        return [0, -5, '', null, false];
     }
 
     public function testGetAllItems()
