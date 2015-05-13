@@ -14,6 +14,13 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertSame($this->redis, $queue->getRedisClient());
     }
 
+    public function testGetQueueName()
+    {
+        $queueName = 'testQueueName-cz:xy';
+        $queue = new UniqueQueue($this->redis, $queueName);
+        $this->assertSame($queueName, $queue->getQueueName());
+    }
+
     public function testGetCount()
     {
         $this->redis->lpush('test', [1, 5, 3]);

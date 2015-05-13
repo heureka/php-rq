@@ -14,6 +14,13 @@ class PoolTest extends BaseTestCase
         $this->assertSame($this->redis, $pool->getRedisClient());
     }
 
+    public function testGetPoolName()
+    {
+        $poolName = 'testPoolName-cz:xy';
+        $pool = new Pool($this->redis, $poolName);
+        $this->assertSame($poolName, $pool->getPoolName());
+    }
+
     public function testGetCount()
     {
         $this->redis->zadd('test', [1 => 123, 2 => 456, 3 => 789]);

@@ -84,6 +84,16 @@ class UniqueQueue
     }
 
     /**
+     * Returns the Queue name
+     *
+     * @return string
+     */
+    public function getQueueName()
+    {
+        return $this->queue;
+    }
+
+    /**
      * Returns the number of items in the queue
      *
      * @return int

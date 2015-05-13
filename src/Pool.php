@@ -76,6 +76,16 @@ class Pool
     }
 
     /**
+     * Returns the Pool name
+     *
+     * @return string
+     */
+    public function getPoolName()
+    {
+        return $this->pool;
+    }
+
+    /**
      * Returns the number of items in the pool
      *
      * @return int
