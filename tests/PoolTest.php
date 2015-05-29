@@ -251,13 +251,13 @@ class PoolTest extends BaseTestCase
         $pool = new Pool($this->redis, 'test');
 
         $pool->removeItem(1);
+        $pool->removeItem(7);
         $pool->removeItem(5);
-        $pool->removeItem(3);
 
         $this->assertSame(3, $this->redis->zcard('test'));
         $items = $this->redis->zrange('test', 0, 5);
-        $this->assertTrue(in_array('5', $items, true));
-        $this->assertTrue(in_array('7', $items, true));
+        $this->assertTrue(in_array('1', $items, true));
+        $this->assertTrue(in_array('3', $items, true));
         $this->assertTrue(in_array('9', $items, true));
         $this->assertKeys(['test']);
     }
@@ -275,12 +275,12 @@ class PoolTest extends BaseTestCase
         $pool = new Pool($this->redis, 'test');
 
         $pool->removeItems([1]);
-        $pool->removeItems([5, 3]);
+        $pool->removeItems([7, 5]);
 
         $this->assertSame(3, $this->redis->zcard('test'));
         $items = $this->redis->zrange('test', 0, 5);
-        $this->assertTrue(in_array('5', $items, true));
-        $this->assertTrue(in_array('7', $items, true));
+        $this->assertTrue(in_array('1', $items, true));
+        $this->assertTrue(in_array('3', $items, true));
         $this->assertTrue(in_array('9', $items, true));
         $this->assertKeys(['test']);
     }
@@ -340,6 +340,10 @@ class PoolTest extends BaseTestCase
         $this->assertSame($time + 5, (int)$this->redis->zscore('test', 7));
 
         $pool->removeItem(7);
+
+        $this->assertSame(7, $this->redis->zcard('test'));
+
+        $pool->removeItem(6);
 
         $this->assertSame(6, $this->redis->zcard('test'));
         $this->assertKeys(['test']);
@@ -415,6 +419,10 @@ class PoolTest extends BaseTestCase
         $this->assertSame($time + 5, (int)$this->redis->zscore('test', $message5Serialized));
 
         $pool->removeItem($message5);
+
+        $this->assertSame(5, $this->redis->zcard('test'));
+
+        $pool->removeItem($message4);
 
         $this->assertSame(4, $this->redis->zcard('test'));
         $this->assertKeys(['test']);

@@ -28,7 +28,7 @@ local pool = KEYS[1]
 local item = ARGV[1]
 
 local score = redis.call('zscore', pool, item)
-if score and score - math.floor(score) < 0.01 then
+if score and score - math.floor(score) > 0.01 then
     redis.call('zrem', pool, item)
 end
 LUA;
