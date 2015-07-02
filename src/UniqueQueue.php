@@ -16,7 +16,7 @@ use PhpRQ\Exception\InvalidArgument;
  *
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class UniqueQueue
+class UniqueQueue extends Base
 {
 
     const OPT_GET_MAX_CHUNK_SIZE        = 0;
@@ -25,11 +25,6 @@ class UniqueQueue
     const OPT_PROCESSING_SUFFIX         = 3;
     const OPT_PROCESSING_TIMEOUT        = 4;
     const OPT_PROCESSING_TIMEOUT_SUFFIX = 5;
-
-    /**
-     * @var ClientInterface
-     */
-    private $redis;
 
     /**
      * Queue name
@@ -61,7 +56,7 @@ class UniqueQueue
      */
     public function __construct(ClientInterface $redis, $queue, $options = [])
     {
-        $this->redis = $redis;
+        parent::__construct($redis);
         $this->queue = $queue;
         foreach ($options as $key => $value) {
             if (!isset($this->options[$key])) {
@@ -71,16 +66,6 @@ class UniqueQueue
             $this->options[$key] = $value;
         }
         $this->clientID = sprintf('%s[%d][%d]', gethostname(), getmypid(), time());
-    }
-
-    /**
-     * Returns the Redis client (useful for disconnecting)
-     *
-     * @return ClientInterface
-     */
-    public function getRedisClient()
-    {
-        return $this->redis;
     }
 
     /**
