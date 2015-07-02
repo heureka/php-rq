@@ -14,7 +14,7 @@ use PhpRQ\Exception\InvalidArgument;
  *
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class Pool
+class Pool extends Base
 {
 
     const OPT_ADD_MAX_CHUNK_SIZE = 0;
@@ -23,11 +23,6 @@ class Pool
     const OPT_DEL_MAX_CHUNK_SIZE = 3;
     const OPT_ACK_TTL            = 4;
     const OPT_ACK_VALID_FOR      = 5;
-
-    /**
-     * @var ClientInterface
-     */
-    private $redis;
 
     /**
      * Pool name
@@ -54,7 +49,7 @@ class Pool
      */
     public function __construct(ClientInterface $redis, $pool, $options = [])
     {
-        $this->redis = $redis;
+        parent::__construct($redis);
         $this->pool = $pool;
         foreach ($options as $key => $value) {
             if (!isset($this->options[$key])) {
@@ -63,16 +58,6 @@ class Pool
 
             $this->options[$key] = $value;
         }
-    }
-
-    /**
-     * Returns the Redis client (useful for disconnecting)
-     *
-     * @return ClientInterface
-     */
-    public function getRedisClient()
-    {
-        return $this->redis;
     }
 
     /**
