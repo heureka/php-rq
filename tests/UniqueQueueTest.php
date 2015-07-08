@@ -18,7 +18,7 @@ class UniqueQueueTest extends BaseTestCase
     {
         $queueName = 'testQueueName-cz:xy';
         $queue = new UniqueQueue($this->redis, $queueName);
-        $this->assertSame($queueName, $queue->getQueueName());
+        $this->assertSame($queueName, $queue->getName());
     }
 
     public function testGetCount()

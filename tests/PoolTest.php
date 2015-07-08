@@ -18,7 +18,7 @@ class PoolTest extends BaseTestCase
     {
         $poolName = 'testPoolName-cz:xy';
         $pool = new Pool($this->redis, $poolName);
-        $this->assertSame($poolName, $pool->getPoolName());
+        $this->assertSame($poolName, $pool->getName());
     }
 
     public function testGetCount()

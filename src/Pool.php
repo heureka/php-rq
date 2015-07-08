@@ -14,7 +14,7 @@ use PhpRQ\Exception\InvalidArgument;
  *
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class Pool
+class Pool extends Base
 {
 
     const OPT_ADD_MAX_CHUNK_SIZE = 0;
@@ -25,64 +25,12 @@ class Pool
     const OPT_ACK_VALID_FOR      = 5;
 
     /**
-     * @var ClientInterface
-     */
-    private $redis;
-
-    /**
-     * Pool name
-     *
-     * @var string
-     */
-    private $pool;
-
-    private $options = [
-        self::OPT_ADD_MAX_CHUNK_SIZE => 100,    // items count
-        self::OPT_GET_MAX_CHUNK_SIZE => 100,    // items count
-        self::OPT_ACK_MAX_CHUNK_SIZE => 500,    // items count
-        self::OPT_DEL_MAX_CHUNK_SIZE => 100,    // items count
-        self::OPT_ACK_TTL            => 600,    // seconds
-        self::OPT_ACK_VALID_FOR      => 129600, // seconds
-    ];
-
-    /**
-     * @param ClientInterface $redis
-     * @param string          $pool    Pool name
-     * @param array           $options
-     *
-     * @throws Exception\UnknownOption
-     */
-    public function __construct(ClientInterface $redis, $pool, $options = [])
-    {
-        $this->redis = $redis;
-        $this->pool = $pool;
-        foreach ($options as $key => $value) {
-            if (!isset($this->options[$key])) {
-                throw new Exception\UnknownOption($key);
-            }
-
-            $this->options[$key] = $value;
-        }
-    }
-
-    /**
-     * Returns the Redis client (useful for disconnecting)
-     *
-     * @return ClientInterface
-     */
-    public function getRedisClient()
-    {
-        return $this->redis;
-    }
-
-    /**
-     * Returns the Pool name
-     *
+     * @deprecated @see Base::getName()
      * @return string
      */
     public function getPoolName()
     {
-        return $this->pool;
+        return $this->getName();
     }
 
     /**
@@ -92,7 +40,7 @@ class Pool
      */
     public function getCount()
     {
-        return $this->redis->zcard($this->pool);
+        return $this->redis->zcard($this->name);
     }
 
     /**
@@ -102,7 +50,7 @@ class Pool
      */
     public function getCountToProcess()
     {
-        return $this->redis->zcount($this->pool, '-inf', time());
+        return $this->redis->zcount($this->name, '-inf', time());
     }
 
     /**
@@ -119,7 +67,7 @@ class Pool
 
             $pipe = $this->redis->pipeline();
             foreach ($items as $item) {
-                $pipe->zscore($this->pool, (string)$item);
+                $pipe->zscore($this->name, (string)$item);
             }
 
             $result = [];
@@ -133,7 +81,7 @@ class Pool
 
             return $result;
         } else {
-            return $this->redis->zscore($this->pool, $item) !== null;
+            return $this->redis->zscore($this->name, $item) !== null;
         }
     }
 
@@ -151,7 +99,7 @@ class Pool
             throw new Exception\InvalidArgument('$item mustn\'t be empty');
         }
 
-        $this->redis->zadd($this->pool, time(), $item);
+        $this->redis->zadd($this->name, time(), $item);
     }
 
     /**
@@ -175,7 +123,7 @@ class Pool
         }
 
         foreach (array_chunk($itemsToAdd, $this->options[self::OPT_ADD_MAX_CHUNK_SIZE], true) as $chunk) {
-            $this->redis->zadd($this->pool, $chunk);
+            $this->redis->zadd($this->name, $chunk);
         }
     }
 
@@ -204,7 +152,7 @@ class Pool
 
         $result = [];
         foreach ($steps as $size) {
-            $chunk = $this->redis->poolGet($this->pool, $size, time(), $this->options[self::OPT_ACK_TTL]);
+            $chunk = $this->redis->poolGet($this->name, $size, time(), $this->options[self::OPT_ACK_TTL]);
             $result = array_merge($result, $chunk);
             if (count($chunk) < count($size)) {
                 break;
@@ -224,7 +172,7 @@ class Pool
         $result = [];
         while (true) {
             $chunk = $this->redis->poolGet(
-                $this->pool,
+                $this->name,
                 $this->options[self::OPT_GET_MAX_CHUNK_SIZE],
                 time(),
                 $this->options[self::OPT_ACK_TTL]
@@ -246,7 +194,7 @@ class Pool
      */
     public function ackItem($item)
     {
-        $this->redis->poolAck($this->pool, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+        $this->redis->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
     }
 
     /**
@@ -262,7 +210,7 @@ class Pool
             try {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunk as $item) {
-                    $pipe->poolAck($this->pool, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+                    $pipe->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
                 }
                 $pipe->execute();
             } catch (\Predis\Response\ServerException $e) {
@@ -290,7 +238,7 @@ class Pool
      */
     public function removeItem($item)
     {
-        $this->redis->poolRemove($this->pool, $item);
+        $this->redis->poolRemove($this->name, $item);
     }
 
     /**
@@ -306,7 +254,7 @@ class Pool
             try {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunk as $item) {
-                    $pipe->poolRemove($this->pool, $item);
+                    $pipe->poolRemove($this->name, $item);
                 }
                 $pipe->execute();
             } catch (\Predis\Response\ServerException $e) {
@@ -333,8 +281,20 @@ class Pool
     public function clearPool()
     {
         do {
-            $removed = $this->redis->zremrangebyrank($this->pool, 0, $this->options[self::OPT_DEL_MAX_CHUNK_SIZE] - 1);
+            $removed = $this->redis->zremrangebyrank($this->name, 0, $this->options[self::OPT_DEL_MAX_CHUNK_SIZE] - 1);
         } while ($removed !== 0);
+    }
+
+    protected function setDefaultOptions()
+    {
+        $this->options = [
+            self::OPT_ADD_MAX_CHUNK_SIZE => 100,    // items count
+            self::OPT_GET_MAX_CHUNK_SIZE => 100,    // items count
+            self::OPT_ACK_MAX_CHUNK_SIZE => 500,    // items count
+            self::OPT_DEL_MAX_CHUNK_SIZE => 100,    // items count
+            self::OPT_ACK_TTL            => 600,    // seconds
+            self::OPT_ACK_VALID_FOR      => 129600, // seconds
+        ];
     }
 
 }
