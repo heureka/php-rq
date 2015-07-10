@@ -69,12 +69,8 @@ class UniqueQueue extends Base
      */
     public function addItem($item)
     {
-        $item = (string)$item;
-        if (empty($item)) {
-            throw new Exception\InvalidArgument('$item mustn\'t be empty');
-        }
-
-        $this->redis->uniqueQueueAdd($this->name, $this->getSetName(), (string)$item);
+        $this->addItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -98,15 +94,19 @@ class UniqueQueue extends Base
                 $pipe->uniqueQueueAdd($this->name, $setName, $item);
             }
             $pipe->execute();
+            $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
                 // this may happen once, when the script isn't loaded into server cache
                 // the following code will guarantee that the script is loaded and that this won't happen again
                 $first = array_shift($items);
-                $this->addItem($first);
+                $this->addItemWithoutSync($first);
                 if ($items) {
                     $this->addItems($items);
+                    return;
                 }
+
+                $this->waitForSlaveSync();
 
                 return;
             }
@@ -200,7 +200,8 @@ class UniqueQueue extends Base
      */
     public function ackItem($item)
     {
-        $this->redis->uniqueQueueAck($this->getProcessingQueueName(), $this->getTimeoutsHashName(), (string)$item);
+        $this->ackItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -221,15 +222,19 @@ class UniqueQueue extends Base
                 $pipe->uniqueQueueAck($processingQueueName, $timeoutsHashName, (string)$item);
             }
             $pipe->execute();
+            $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
                 // this may happen once, when the script isn't loaded into server cache
                 // the following code will guarantee that the script is loaded and that this won't happen again
                 $first = array_shift($items);
-                $this->ackItem((string)$first);
+                $this->ackItemWithoutSync($first);
                 if ($items) {
                     $this->ackItems($items);
+                    return;
                 }
+
+                $this->waitForSlaveSync();
 
                 return;
             }
@@ -249,13 +254,8 @@ class UniqueQueue extends Base
      */
     public function rejectItem($item)
     {
-        $this->redis->uniqueQueueReject(
-            $this->name,
-            $this->getSetName(),
-            $this->getProcessingQueueName(),
-            $this->getTimeoutsHashName(),
-            (string)$item
-        );
+        $this->rejectItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -289,15 +289,19 @@ class UniqueQueue extends Base
                 );
             }
             $pipe->execute();
+            $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
                 // this may happen once, when the script isn't loaded into server cache
                 // the following code will guarantee that the script is loaded and that this won't happen again
                 $first = array_pop($items);
-                $this->rejectItem((string)$first);
+                $this->rejectItemWithoutSync($first);
                 if ($items) {
                     $this->rejectItems($items);
+                    return;
                 }
+
+                $this->waitForSlaveSync();
 
                 return;
             }
@@ -319,6 +323,8 @@ class UniqueQueue extends Base
             $this->getProcessingQueueName(),
             $this->getTimeoutsHashName()
         );
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -350,6 +356,8 @@ class UniqueQueue extends Base
                 $this->redis->uniqueQueueReEnqueue($this->name, $setName, $processingQueueName, $timeoutsHashName);
             }
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -369,6 +377,8 @@ class UniqueQueue extends Base
         foreach ($queues as $processingQueueName => $time) {
             $this->redis->uniqueQueueReEnqueue($this->name, $setName, $processingQueueName, $timeoutsHashName);
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -399,6 +409,8 @@ class UniqueQueue extends Base
             }
         }
         $pipe->execute();
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -410,15 +422,8 @@ class UniqueQueue extends Base
      */
     public function dropAllItems()
     {
-        $timeoutsHashName = $this->getTimeoutsHashName();
-
-        $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
-        $pipe = $this->redis->pipeline();
-        foreach ($queues as $processingQueueName => $time) {
-            $pipe->del($processingQueueName);
-            $pipe->hdel($timeoutsHashName, $processingQueueName);
-        }
-        $pipe->execute();
+        $this->dropAllItemsWithoutSync();
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -426,7 +431,7 @@ class UniqueQueue extends Base
      */
     public function clearQueue()
     {
-        $this->dropAllItems();
+        $this->dropAllItemsWithoutSync();
 
         $setName = $this->getSetName();
 
@@ -438,6 +443,8 @@ class UniqueQueue extends Base
             }
             $pipe->execute();
         } while ($this->redis->spop($setName) !== null || $this->redis->rpop($this->name) !== null);
+
+        $this->waitForSlaveSync();
     }
 
     protected function setDefaultOptions()
@@ -476,6 +483,54 @@ class UniqueQueue extends Base
     private function getTimeoutsHashName()
     {
         return $this->name . $this->options[self::OPT_PROCESSING_TIMEOUT_SUFFIX];
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function addItemWithoutSync($item)
+    {
+        $item = (string)$item;
+        if (empty($item)) {
+            throw new Exception\InvalidArgument('$item mustn\'t be empty');
+        }
+
+        $this->redis->uniqueQueueAdd($this->name, $this->getSetName(), (string)$item);
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function ackItemWithoutSync($item)
+    {
+        $this->redis->uniqueQueueAck($this->getProcessingQueueName(), $this->getTimeoutsHashName(), (string)$item);
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function rejectItemWithoutSync($item)
+    {
+        $this->redis->uniqueQueueReject(
+            $this->name,
+            $this->getSetName(),
+            $this->getProcessingQueueName(),
+            $this->getTimeoutsHashName(),
+            (string)$item
+        );
+    }
+
+    private function dropAllItemsWithoutSync()
+    {
+        $timeoutsHashName = $this->getTimeoutsHashName();
+
+        $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
+        $pipe = $this->redis->pipeline();
+        foreach ($queues as $processingQueueName => $time) {
+            $pipe->del($processingQueueName);
+            $pipe->hdel($timeoutsHashName, $processingQueueName);
+        }
+        $pipe->execute();
     }
 
 }

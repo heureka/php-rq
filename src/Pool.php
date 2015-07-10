@@ -100,6 +100,7 @@ class Pool extends Base
         }
 
         $this->redis->zadd($this->name, time(), $item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -125,6 +126,8 @@ class Pool extends Base
         foreach (array_chunk($itemsToAdd, $this->options[self::OPT_ADD_MAX_CHUNK_SIZE], true) as $chunk) {
             $this->redis->zadd($this->name, $chunk);
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -194,7 +197,8 @@ class Pool extends Base
      */
     public function ackItem($item)
     {
-        $this->redis->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+        $this->ackItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -213,15 +217,19 @@ class Pool extends Base
                     $pipe->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
                 }
                 $pipe->execute();
+                $this->waitForSlaveSync();
             } catch (\Predis\Response\ServerException $e) {
                 if ($e->getErrorType() === 'NOSCRIPT') {
                     // this may happen once, when the script isn't loaded into server cache
                     // the following code will guarantee that the script is loaded and that this won't happen again
                     $first = array_shift($items);
-                    $this->ackItem($first);
+                    $this->ackItemWithoutSync($first);
                     if ($items) {
                         $this->ackItems($items);
+                        return;
                     }
+
+                    $this->waitForSlaveSync();
 
                     return;
                 }
@@ -238,7 +246,8 @@ class Pool extends Base
      */
     public function removeItem($item)
     {
-        $this->redis->poolRemove($this->name, $item);
+        $this->removeItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -257,15 +266,19 @@ class Pool extends Base
                     $pipe->poolRemove($this->name, $item);
                 }
                 $pipe->execute();
+                $this->waitForSlaveSync();
             } catch (\Predis\Response\ServerException $e) {
                 if ($e->getErrorType() === 'NOSCRIPT') {
                     // this may happen once, when the script isn't loaded into server cache
                     // the following code will guarantee that the script is loaded and that this won't happen again
                     $first = array_shift($items);
-                    $this->removeItem($first);
+                    $this->removeItemWithoutSync($first);
                     if ($items) {
                         $this->removeItems($items);
+                        return;
                     }
+
+                    $this->waitForSlaveSync();
 
                     return;
                 }
@@ -283,6 +296,8 @@ class Pool extends Base
         do {
             $removed = $this->redis->zremrangebyrank($this->name, 0, $this->options[self::OPT_DEL_MAX_CHUNK_SIZE] - 1);
         } while ($removed !== 0);
+
+        $this->waitForSlaveSync();
     }
 
     protected function setDefaultOptions()
@@ -295,6 +310,22 @@ class Pool extends Base
             self::OPT_ACK_TTL            => 600,    // seconds
             self::OPT_ACK_VALID_FOR      => 129600, // seconds
         ];
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function ackItemWithoutSync($item)
+    {
+        $this->redis->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function removeItemWithoutSync($item)
+    {
+        $this->redis->poolRemove($this->name, $item);
     }
 
 }

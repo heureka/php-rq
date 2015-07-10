@@ -11,6 +11,10 @@ namespace PhpRQ;
 abstract class Base
 {
 
+    const OPT_SLAVES_SYNC_ENABLED        = -1;
+    const OPT_SLAVES_SYNC_REQUIRED_COUNT = -2;
+    const OPT_SLAVES_SYNC_TIMEOUT        = -3;
+
     /**
      * @var ClientInterface
      */
@@ -45,6 +49,10 @@ abstract class Base
 
         $this->setDefaultOptions();
 
+        $this->options[self::OPT_SLAVES_SYNC_ENABLED]        = false;
+        $this->options[self::OPT_SLAVES_SYNC_REQUIRED_COUNT] = 0;
+        $this->options[self::OPT_SLAVES_SYNC_TIMEOUT]        = 100;
+
         foreach ($options as $key => $value) {
             if (!isset($this->options[$key])) {
                 throw new Exception\UnknownOption($key);
@@ -55,6 +63,28 @@ abstract class Base
     }
 
     abstract protected function setDefaultOptions();
+
+    /**
+     * If slave synchronous syncing is enabled (@see self::OPT_SLAVES_SYNC_ENABLED) then this method ensures
+     * that @see self::OPT_SLAVES_SYNC_REQUIRED_COUNT number of slaves will acknowledge all issued commands
+     * within @see self::OPT_SLAVES_SYNC_TIMEOUT. If syncing is enabled and slaves fail to acknowledge the issued
+     * commands then an exception is thrown
+     */
+    protected function waitForSlaveSync()
+    {
+        if ($this->options[self::OPT_SLAVES_SYNC_ENABLED]) {
+            $synced = $this->redis->wait(
+                $this->options[self::OPT_SLAVES_SYNC_REQUIRED_COUNT],
+                $this->options[self::OPT_SLAVES_SYNC_TIMEOUT]
+            );
+
+            if ($synced < $this->options[self::OPT_SLAVES_SYNC_REQUIRED_COUNT]) {
+                throw new Exception\NotEnoughSlavesSynced(sprintf('Required: %d, synced: %d',
+                    $this->options[self::OPT_SLAVES_SYNC_REQUIRED_COUNT], $synced
+                ));
+            }
+        }
+    }
 
     /**
      * Returns the Redis client (useful for disconnecting)

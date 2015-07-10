@@ -33,6 +33,8 @@ class Client extends \Predis\Client implements ClientInterface
         $profile->defineCommand('poolGet', 'PhpRQ\Command\Pool\Get');
         $profile->defineCommand('poolAck', 'PhpRQ\Command\Pool\Ack');
         $profile->defineCommand('poolRemove', 'PhpRQ\Command\Pool\Remove');
+
+        $profile->defineCommand('wait', 'PhpRQ\Command\Wait');
     }
 
     /**
@@ -127,6 +129,14 @@ class Client extends \Predis\Client implements ClientInterface
      * @inheritdoc
      */
     public function poolRemove($pool, $item)
+    {
+        return parent::__call(__FUNCTION__, func_get_args());
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function wait($numberOfSlaves, $timeout)
     {
         return parent::__call(__FUNCTION__, func_get_args());
     }
