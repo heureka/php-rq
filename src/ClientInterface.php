@@ -116,4 +116,12 @@ interface ClientInterface extends \Predis\ClientInterface
      */
     public function poolRemove($pool, $item);
 
+    /**
+     * @param int $numberOfSlaves How many slaves must be synced to consider the write operation successful
+     * @param int $timeout        Timeout in milliseconds
+     *
+     * @return int Number of slaves synced (can be lesser than $numberOfSlaves when a timeout occur)
+     */
+    public function wait($numberOfSlaves, $timeout);
+
 }

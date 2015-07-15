@@ -6,10 +6,12 @@ php:
   - 7.0
   - hhvm
   - nightly
-services:
-  - redis-server
 install:
   - composer install --prefer-source --no-interaction
+  - wget http://download.redis.io/redis-stable.tar.gz && tar xzf redis-stable.tar.gz && cd redis-stable && make
+  - src/redis-server -v
+  - src/redis-server --daemonize yes
+  - cd ..
 before_script:
   - chmod u+x php-rq-run-tests
 script:

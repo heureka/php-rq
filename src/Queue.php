@@ -16,7 +16,7 @@ use PhpRQ\Exception\InvalidArgument;
  *
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class Queue
+class Queue extends Base
 {
 
     const OPT_ADD_MAX_CHUNK_SIZE        = 0;
@@ -27,70 +27,27 @@ class Queue
     const OPT_PROCESSING_TIMEOUT_SUFFIX = 5;
 
     /**
-     * @var ClientInterface
-     */
-    private $redis;
-
-    /**
-     * Queue name
-     *
-     * @var string
-     */
-    private $queue;
-
-    private $options = [
-        self::OPT_ADD_MAX_CHUNK_SIZE        => 100,           // items count
-        self::OPT_GET_MAX_CHUNK_SIZE        => 100,           // items count
-        self::OPT_DEL_MAX_CHUNK_SIZE        => 1000,          // items count
-        self::OPT_PROCESSING_SUFFIX         => '-processing', // string suffix
-        self::OPT_PROCESSING_TIMEOUT        => 7200,          // seconds
-        self::OPT_PROCESSING_TIMEOUT_SUFFIX => '-timeouts',   // string suffix
-    ];
-
-    /**
      * @var string
      */
     private $clientID;
 
     /**
-     * @param ClientInterface $redis
-     * @param string          $queue   Queue name
-     * @param array           $options
-     *
-     * @throws Exception\UnknownOption
+     * @inheritdoc
      */
-    public function __construct(ClientInterface $redis, $queue, $options = [])
+    public function __construct(ClientInterface $redis, $name, $options = [])
     {
-        $this->redis = $redis;
-        $this->queue = $queue;
-        foreach ($options as $key => $value) {
-            if (!isset($this->options[$key])) {
-                throw new Exception\UnknownOption($key);
-            }
+        parent::__construct($redis, $name, $options);
 
-            $this->options[$key] = $value;
-        }
         $this->clientID = sprintf('%s[%d][%d]', gethostname(), getmypid(), time());
     }
 
     /**
-     * Returns the Redis client (useful for disconnecting)
-     *
-     * @return ClientInterface
-     */
-    public function getRedisClient()
-    {
-        return $this->redis;
-    }
-
-    /**
-     * Returns the Queue name
-     *
+     * @deprecated @see Base::getName()
      * @return string
      */
     public function getQueueName()
     {
-        return $this->queue;
+        return $this->getName();
     }
 
     /**
@@ -100,7 +57,7 @@ class Queue
      */
     public function getCount()
     {
-        return $this->redis->llen($this->queue);
+        return $this->redis->llen($this->name);
     }
 
     /**
@@ -117,7 +74,8 @@ class Queue
             throw new Exception\InvalidArgument('$item mustn\'t be empty');
         }
 
-        $this->redis->lpush($this->queue, $item);
+        $this->redis->lpush($this->name, $item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -137,9 +95,10 @@ class Queue
                     throw new Exception\InvalidArgument('Items in $items mustn\'t be empty');
                 }
             }
-            $pipe->lpush($this->queue, $chunk);
+            $pipe->lpush($this->name, $chunk);
         }
         $pipe->execute();
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -171,7 +130,7 @@ class Queue
         $result = [];
         foreach ($steps as $size) {
             $chunk = $this->redis->queueGet(
-                $this->queue,
+                $this->name,
                 $processingQueueName,
                 $timeoutsHashName,
                 $size,
@@ -200,7 +159,7 @@ class Queue
         $result = [];
         while (true) {
             $chunk = $this->redis->queueGet(
-                $this->queue,
+                $this->name,
                 $processingQueueName,
                 $timeoutsHashName,
                 $this->options[self::OPT_GET_MAX_CHUNK_SIZE],
@@ -223,7 +182,8 @@ class Queue
      */
     public function ackItem($item)
     {
-        $this->redis->queueAck($this->getProcessingQueueName(), $this->getTimeoutsHashName(), (string)$item);
+        $this->ackItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -244,15 +204,19 @@ class Queue
                 $pipe->queueAck($processingQueueName, $timeoutsHashName, (string)$item);
             }
             $pipe->execute();
+            $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
                 // this may happen once, when the script isn't loaded into server cache
                 // the following code will guarantee that the script is loaded and that this won't happen again
                 $first = array_shift($items);
-                $this->ackItem((string)$first);
+                $this->ackItemWithoutSync($first);
                 if ($items) {
                     $this->ackItems($items);
+                    return;
                 }
+
+                $this->waitForSlaveSync();
 
                 return;
             }
@@ -272,12 +236,8 @@ class Queue
      */
     public function rejectItem($item)
     {
-        $this->redis->queueReject(
-            $this->queue,
-            $this->getProcessingQueueName(),
-            $this->getTimeoutsHashName(),
-            (string)$item
-        );
+        $this->rejectItemWithoutSync($item);
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -301,18 +261,22 @@ class Queue
 
             $pipe = $this->redis->pipeline();
             foreach ($reversedItems as $item) {
-                $pipe->queueReject($this->queue, $processingQueueName, $timeoutsHashName, (string)$item);
+                $pipe->queueReject($this->name, $processingQueueName, $timeoutsHashName, (string)$item);
             }
             $pipe->execute();
+            $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
                 // this may happen once, when the script isn't loaded into server cache
                 // the following code will guarantee that the script is loaded and that this won't happen again
                 $first = array_pop($items);
-                $this->rejectItem((string)$first);
+                $this->rejectItemWithoutSync($first);
                 if ($items) {
                     $this->rejectItems($items);
+                    return;
                 }
+
+                $this->waitForSlaveSync();
 
                 return;
             }
@@ -328,7 +292,8 @@ class Queue
      */
     public function rejectBatch()
     {
-        $this->redis->queueReEnqueue($this->queue, $this->getProcessingQueueName(), $this->getTimeoutsHashName());
+        $this->redis->queueReEnqueue($this->name, $this->getProcessingQueueName(), $this->getTimeoutsHashName());
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -356,9 +321,11 @@ class Queue
         arsort($queues, SORT_NUMERIC);
         foreach ($queues as $processingQueueName => $time) {
             if ($time + $timeout < time()) {
-                $this->redis->queueReEnqueue($this->queue, $processingQueueName, $timeoutsHashName);
+                $this->redis->queueReEnqueue($this->name, $processingQueueName, $timeoutsHashName);
             }
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -375,8 +342,10 @@ class Queue
         $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
         arsort($queues, SORT_NUMERIC);
         foreach ($queues as $processingQueueName => $time) {
-            $this->redis->queueReEnqueue($this->queue, $processingQueueName, $timeoutsHashName);
+            $this->redis->queueReEnqueue($this->name, $processingQueueName, $timeoutsHashName);
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -409,6 +378,8 @@ class Queue
             }
         }
         $pipe->execute();
+
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -420,15 +391,8 @@ class Queue
      */
     public function dropAllItems()
     {
-        $timeoutsHashName = $this->getTimeoutsHashName();
-
-        $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
-        $pipe = $this->redis->pipeline();
-        foreach ($queues as $processingQueueName => $time) {
-            $pipe->del($processingQueueName);
-            $pipe->hdel($timeoutsHashName, $processingQueueName);
-        }
-        $pipe->execute();
+        $this->dropAllItemsWithoutSync();
+        $this->waitForSlaveSync();
     }
 
     /**
@@ -436,15 +400,29 @@ class Queue
      */
     public function clearQueue()
     {
-        $this->dropAllItems();
+        $this->dropAllItemsWithoutSync();
 
         do {
             $pipe = $this->redis->pipeline();
             for ($i = 0; $i < $this->options[self::OPT_DEL_MAX_CHUNK_SIZE]; $i++) {
-                $pipe->rpop($this->queue);
+                $pipe->rpop($this->name);
             }
             $pipe->execute();
-        } while ($this->redis->rpop($this->queue) !== null);
+        } while ($this->redis->rpop($this->name) !== null);
+
+        $this->waitForSlaveSync();
+    }
+
+    protected function setDefaultOptions()
+    {
+        $this->options = [
+            self::OPT_ADD_MAX_CHUNK_SIZE        => 100,           // items count
+            self::OPT_GET_MAX_CHUNK_SIZE        => 100,           // items count
+            self::OPT_DEL_MAX_CHUNK_SIZE        => 1000,          // items count
+            self::OPT_PROCESSING_SUFFIX         => '-processing', // string suffix
+            self::OPT_PROCESSING_TIMEOUT        => 7200,          // seconds
+            self::OPT_PROCESSING_TIMEOUT_SUFFIX => '-timeouts',   // string suffix
+        ];
     }
 
     /**
@@ -452,7 +430,7 @@ class Queue
      */
     private function getProcessingQueueName()
     {
-        $baseName = $this->queue . $this->options[self::OPT_PROCESSING_SUFFIX];
+        $baseName = $this->name . $this->options[self::OPT_PROCESSING_SUFFIX];
 
         return $baseName . '-' . $this->clientID;
     }
@@ -462,7 +440,41 @@ class Queue
      */
     private function getTimeoutsHashName()
     {
-        return $this->queue . $this->options[self::OPT_PROCESSING_TIMEOUT_SUFFIX];
+        return $this->name . $this->options[self::OPT_PROCESSING_TIMEOUT_SUFFIX];
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function ackItemWithoutSync($item)
+    {
+        $this->redis->queueAck($this->getProcessingQueueName(), $this->getTimeoutsHashName(), (string)$item);
+    }
+
+    /**
+     * @param mixed $item
+     */
+    private function rejectItemWithoutSync($item)
+    {
+        $this->redis->queueReject(
+            $this->name,
+            $this->getProcessingQueueName(),
+            $this->getTimeoutsHashName(),
+            (string)$item
+        );
+    }
+
+    private function dropAllItemsWithoutSync()
+    {
+        $timeoutsHashName = $this->getTimeoutsHashName();
+
+        $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
+        $pipe = $this->redis->pipeline();
+        foreach ($queues as $processingQueueName => $time) {
+            $pipe->del($processingQueueName);
+            $pipe->hdel($timeoutsHashName, $processingQueueName);
+        }
+        $pipe->execute();
     }
 
 }
