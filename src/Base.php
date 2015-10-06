@@ -36,6 +36,12 @@ abstract class Base
     protected $options;
 
     /**
+     * For testing we want use DI defined timestamp
+     * @var int|null timestamp
+     */
+    protected $timeForTesting = null;
+
+    /**
      * @param ClientInterface $redis
      * @param string          $name
      * @param array           $options
@@ -104,6 +110,22 @@ abstract class Base
     public function getName()
     {
         return $this->name;
+    }
+
+    /**
+     * @param $timeStamp
+     */
+    public function setTimeForTestingPurpose($timeStamp)
+    {
+        $this->timeForTesting = $timeStamp;
+    }
+
+    /**
+     * @return int
+     */
+    protected function getTime()
+    {
+        return null !== $this->timeForTesting ? $this->timeForTesting : time();
     }
 
 }

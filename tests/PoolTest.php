@@ -35,6 +35,7 @@ class PoolTest extends BaseTestCase
         $time = time();
         $this->redis->zadd('test', [1 => $time - 5, 2 => $time - 3, 3 => $time + 5]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $this->assertSame(2, $pool->getCountToProcess());
         $this->assertKeys(['test']);
@@ -65,6 +66,7 @@ class PoolTest extends BaseTestCase
     {
         $time = time();
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
         $pool->addItem(1);
         $pool->addItem(3);
         $pool->addItem(5);
@@ -98,6 +100,7 @@ class PoolTest extends BaseTestCase
     {
         $time = time();
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
         $pool->addItems([1, 3, 5, 3]);
         $pool->addItems([3, 6]);
 
@@ -138,6 +141,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $items = $pool->getItems(2);
         $this->assertSame(['1', '3'], $items);
@@ -179,6 +183,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $items = $pool->getAllItems();
         $this->assertSame(['1', '3', '5', '7'], $items);
@@ -200,6 +205,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $pool->ackItem(1);
         $pool->ackItem(5);
@@ -225,6 +231,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $pool->ackItems([1]);
         $pool->ackItems([5, 3]);
@@ -249,6 +256,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $pool->removeItem(1);
         $pool->removeItem(7);
@@ -273,6 +281,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
 
         $pool->removeItems([1]);
         $pool->removeItems([7, 5]);
@@ -296,6 +305,7 @@ class PoolTest extends BaseTestCase
             9 => $time + 5,
         ]);
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
         $pool->clearPool();
 
         $this->assertKeys([]);
@@ -305,6 +315,7 @@ class PoolTest extends BaseTestCase
     {
         $time = time();
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
         $pool->addItems([1, 2, 3, 4, 5, 6, 7]);
 
         $this->assertSame(7, $this->redis->zcard('test'));
@@ -388,6 +399,7 @@ class PoolTest extends BaseTestCase
 
         $time = time();
         $pool = new Pool($this->redis, 'test');
+        $pool->setTimeForTestingPurpose($time);
         $pool->addItems([$message1, $message2, $message3, $message4, $message5]);
 
         $this->assertSame(5, $this->redis->zcard('test'));
