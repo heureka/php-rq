@@ -38,23 +38,21 @@ class QueueSyncTest extends BaseTestCase
 
     public function testAckItemSync()
     {
-        $time = time();
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 5, 3]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         try {
             $queue->ackItem(5);
         } catch (\PhpRQ\Exception\NotEnoughSlavesSynced $e) {}
 
         $this->assertSame(['3', '5', '1'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             $processingQueue,
             'test-timeouts'
@@ -63,23 +61,21 @@ class QueueSyncTest extends BaseTestCase
 
     public function testAckItemsSync()
     {
-        $time = time();
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 5, 3]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         try {
             $queue->ackItems([1, 5]);
         } catch (\PhpRQ\Exception\NotEnoughSlavesSynced $e) {}
 
         $this->assertSame(['3', '5'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             $processingQueue,
             'test-timeouts'
@@ -88,16 +84,14 @@ class QueueSyncTest extends BaseTestCase
 
     public function testRejectItemSync()
     {
-        $time = time();
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 5, 3]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         try {
             $queue->rejectItem(5);
@@ -106,7 +100,7 @@ class QueueSyncTest extends BaseTestCase
         // order of the items is lost when using Queue:rejectItem, be aware of that
         $this->assertSame(['5'], $this->redis->lrange('test', 0, 5));
         $this->assertSame(['3', '5', '1'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             'test',
             $processingQueue,
@@ -116,16 +110,14 @@ class QueueSyncTest extends BaseTestCase
 
     public function testRejectItemsSync()
     {
-        $time = time();
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 5, 3, 6, 7]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         try {
             $queue->rejectItems([1, 5]);
@@ -135,7 +127,7 @@ class QueueSyncTest extends BaseTestCase
         // items at once. Consecutive calls of this method causes the lost of the items order.
         $this->assertSame(['5', '1'], $this->redis->lrange('test', 0, 5));
         $this->assertSame(['7', '6', '3', '5'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             'test',
             $processingQueue,
@@ -145,16 +137,14 @@ class QueueSyncTest extends BaseTestCase
 
     public function testRejectBatchSync()
     {
-        $time = time();
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 5, 3, 6, 7]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         try {
             $queue->ackItem(5);
@@ -169,24 +159,22 @@ class QueueSyncTest extends BaseTestCase
 
     public function testReEnqueueTimedOutItemsSync()
     {
-        $time = time();
-        $uTime = microtime(true);
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         try {
             $queue->reEnqueueTimedOutItems(7);
@@ -194,7 +182,10 @@ class QueueSyncTest extends BaseTestCase
 
         $this->assertSame(['6', '4', '1', '3', '5', '1'], $this->redis->lrange('test', 0, 10));
         $this->assertSame(['8', '7', '4'], $this->redis->lrange($processingQueue3, 0, 5));
-        $this->assertSame([$processingQueue3 => (string)($uTime - 5)], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame(
+            [$processingQueue3 => (string)(self::MICRO_TIME_MOCK - 5)],
+            $this->redis->hgetall('test-timeouts')
+        );
         $this->assertKeys([
             'test',
             'test-timeouts',
@@ -204,24 +195,22 @@ class QueueSyncTest extends BaseTestCase
 
     public function testReEnqueueAllItemsSync()
     {
-        $time = time();
-        $uTime = microtime(true);
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         try {
             $queue->reEnqueueAllItems();
@@ -233,24 +222,22 @@ class QueueSyncTest extends BaseTestCase
 
     public function testDropTimedOutItemsSync()
     {
-        $time = time();
-        $uTime = microtime(true);
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
 
         try {
@@ -259,7 +246,10 @@ class QueueSyncTest extends BaseTestCase
 
         $this->assertSame([], $this->redis->lrange('test', 0, 5));
         $this->assertSame(['8', '7', '4'], $this->redis->lrange($processingQueue3, 0, 5));
-        $this->assertSame([$processingQueue3 => (string)($uTime - 5)], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame(
+            [$processingQueue3 => (string)(self::MICRO_TIME_MOCK - 5)],
+            $this->redis->hgetall('test-timeouts')
+        );
         $this->assertKeys([
             'test-timeouts',
             $processingQueue3,
@@ -268,24 +258,22 @@ class QueueSyncTest extends BaseTestCase
 
     public function testDropAllItemsSync()
     {
-        $time = time();
-        $uTime = microtime(true);
         $queue = new Queue($this->redis, 'test', [
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         try {
             $queue->dropAllItems();
@@ -297,23 +285,21 @@ class QueueSyncTest extends BaseTestCase
 
     public function testClearQueueSync()
     {
-        $time = time();
-        $uTime = microtime(true);
         $queue = new Queue($this->redis, 'test', [
             UniqueQueue::OPT_DEL_MAX_CHUNK_SIZE  => 2,
             Base::OPT_SLAVES_SYNC_ENABLED        => true,
             Base::OPT_SLAVES_SYNC_REQUIRED_COUNT => 5,
-        ]);
+        ], $this->getTimeMock());
 
         $this->redis->lpush('test', [1, 5, 3]);
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 8, 4]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [2, 6, 7]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
         try {
             $queue->clearQueue();

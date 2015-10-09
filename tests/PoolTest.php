@@ -32,9 +32,8 @@ class PoolTest extends BaseTestCase
 
     public function testGetCountToProcess()
     {
-        $time = time();
-        $this->redis->zadd('test', [1 => $time - 5, 2 => $time - 3, 3 => $time + 5]);
-        $pool = new Pool($this->redis, 'test');
+        $this->redis->zadd('test', [1 => self::TIME_MOCK - 5, 2 => self::TIME_MOCK - 3, 3 => self::TIME_MOCK + 5]);
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $this->assertSame(2, $pool->getCountToProcess());
         $this->assertKeys(['test']);
@@ -63,15 +62,14 @@ class PoolTest extends BaseTestCase
 
     public function testAddItem()
     {
-        $time = time();
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
         $pool->addItem(1);
         $pool->addItem(3);
         $pool->addItem(5);
         $pool->addItem(3);
 
         $this->assertSame(
-            array_fill_keys(['1', '3', '5'], (string)$time),
+            array_fill_keys(['1', '3', '5'], (string)self::TIME_MOCK),
             $this->redis->zrange('test', 0, 5, 'WITHSCORES')
         );
         $this->assertKeys(['test']);
@@ -96,13 +94,12 @@ class PoolTest extends BaseTestCase
 
     public function testAddItems()
     {
-        $time = time();
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
         $pool->addItems([1, 3, 5, 3]);
         $pool->addItems([3, 6]);
 
         $this->assertSame(
-            array_fill_keys(['1', '3', '5', '6'], (string)$time),
+            array_fill_keys(['1', '3', '5', '6'], (string)self::TIME_MOCK),
             $this->redis->zrange('test', 0, 5, 'WITHSCORES')
         );
         $this->assertKeys(['test']);
@@ -129,15 +126,14 @@ class PoolTest extends BaseTestCase
 
     public function testGetItems()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 5,
-            3 => $time - 2,
-            5 => $time,
-            7 => $time + 2,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 5,
+            3 => self::TIME_MOCK - 2,
+            5 => self::TIME_MOCK,
+            7 => self::TIME_MOCK + 2,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $items = $pool->getItems(2);
         $this->assertSame(['1', '3'], $items);
@@ -170,15 +166,14 @@ class PoolTest extends BaseTestCase
 
     public function testGetAllItems()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10,
-            3 => $time - 5,
-            5 => $time - 2,
-            7 => $time,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10,
+            3 => self::TIME_MOCK - 5,
+            5 => self::TIME_MOCK - 2,
+            7 => self::TIME_MOCK,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $items = $pool->getAllItems();
         $this->assertSame(['1', '3', '5', '7'], $items);
@@ -191,64 +186,61 @@ class PoolTest extends BaseTestCase
 
     public function testAckItem()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10 + 600.1,
-            3 => $time - 5  + 600.1,
-            5 => $time - 2  + 600.1,
-            7 => $time      + 600.1,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10 + 600.1,
+            3 => self::TIME_MOCK - 5  + 600.1,
+            5 => self::TIME_MOCK - 2  + 600.1,
+            7 => self::TIME_MOCK      + 600.1,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $pool->ackItem(1);
         $pool->ackItem(5);
         $pool->ackItem(3);
 
         $this->assertSame(5, $this->redis->zcard('test'));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 1));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 3));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 5));
-        $this->assertSame(round($time + 600.1, 1), round($this->redis->zscore('test', 7), 1));
-        $this->assertSame($time + 5, (int)$this->redis->zscore('test', 9));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 1));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 3));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 5));
+        $this->assertSame(round(self::TIME_MOCK + 600.1, 1), round($this->redis->zscore('test', 7), 1));
+        $this->assertSame(self::TIME_MOCK + 5, (int)$this->redis->zscore('test', 9));
         $this->assertKeys(['test']);
     }
 
     public function testAckItems()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10 + 600.1,
-            3 => $time - 5  + 600.1,
-            5 => $time - 2  + 600.1,
-            7 => $time      + 600.1,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10 + 600.1,
+            3 => self::TIME_MOCK - 5  + 600.1,
+            5 => self::TIME_MOCK - 2  + 600.1,
+            7 => self::TIME_MOCK      + 600.1,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $pool->ackItems([1]);
         $pool->ackItems([5, 3]);
 
         $this->assertSame(5, $this->redis->zcard('test'));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 1));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 3));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 5));
-        $this->assertSame(round($time + 600.1, 1), round($this->redis->zscore('test', 7), 1));
-        $this->assertSame($time + 5, (int)$this->redis->zscore('test', 9));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 1));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 3));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 5));
+        $this->assertSame(round(self::TIME_MOCK + 600.1, 1), round($this->redis->zscore('test', 7), 1));
+        $this->assertSame(self::TIME_MOCK + 5, (int)$this->redis->zscore('test', 9));
         $this->assertKeys(['test']);
     }
 
     public function testRemoveItem()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10,
-            3 => $time - 5,
-            5 => $time - 2 + 600.1,
-            7 => $time     + 600.1,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10,
+            3 => self::TIME_MOCK - 5,
+            5 => self::TIME_MOCK - 2 + 600.1,
+            7 => self::TIME_MOCK     + 600.1,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $pool->removeItem(1);
         $pool->removeItem(7);
@@ -264,15 +256,14 @@ class PoolTest extends BaseTestCase
 
     public function testRemoveItems()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10,
-            3 => $time - 5,
-            5 => $time - 2  + 600.1,
-            7 => $time      + 600.1,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10,
+            3 => self::TIME_MOCK - 5,
+            5 => self::TIME_MOCK - 2  + 600.1,
+            7 => self::TIME_MOCK      + 600.1,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
 
         $pool->removeItems([1]);
         $pool->removeItems([7, 5]);
@@ -287,15 +278,14 @@ class PoolTest extends BaseTestCase
 
     public function testClearPool()
     {
-        $time = time();
         $this->redis->zadd('test', [
-            1 => $time - 10,
-            3 => $time - 5,
-            5 => $time - 2  + 600.1,
-            7 => $time      + 600.1,
-            9 => $time + 5,
+            1 => self::TIME_MOCK - 10,
+            3 => self::TIME_MOCK - 5,
+            5 => self::TIME_MOCK - 2  + 600.1,
+            7 => self::TIME_MOCK      + 600.1,
+            9 => self::TIME_MOCK + 5,
         ]);
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
         $pool->clearPool();
 
         $this->assertKeys([]);
@@ -303,8 +293,7 @@ class PoolTest extends BaseTestCase
 
     public function testRealUseCaseExample1()
     {
-        $time = time();
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
         $pool->addItems([1, 2, 3, 4, 5, 6, 7]);
 
         $this->assertSame(7, $this->redis->zcard('test'));
@@ -317,7 +306,7 @@ class PoolTest extends BaseTestCase
         $this->assertTrue(in_array('6', $items, true));
         $this->assertTrue(in_array('7', $items, true));
 
-        $this->redis->zadd('test', [7 => $time + 5]);
+        $this->redis->zadd('test', [7 => self::TIME_MOCK + 5]);
 
         $items = $pool->getItems(3);
         $this->assertSame(['1', '2', '3'], $items);
@@ -331,13 +320,13 @@ class PoolTest extends BaseTestCase
         $pool->ackItems([2, 4, 5]);
 
         $this->assertSame(7, $this->redis->zcard('test'));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 1));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 2));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 3));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 4));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', 5));
-        $this->assertSame(round($time + 600.1, 1), round($this->redis->zscore('test', 6), 1));
-        $this->assertSame($time + 5, (int)$this->redis->zscore('test', 7));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 1));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 2));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 3));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 4));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', 5));
+        $this->assertSame(round(self::TIME_MOCK + 600.1, 1), round($this->redis->zscore('test', 6), 1));
+        $this->assertSame(self::TIME_MOCK + 5, (int)$this->redis->zscore('test', 7));
 
         $pool->removeItem(7);
 
@@ -386,8 +375,7 @@ class PoolTest extends BaseTestCase
         $message5->bool = true;
         $message5Serialized = serialize($message5);
 
-        $time = time();
-        $pool = new Pool($this->redis, 'test');
+        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
         $pool->addItems([$message1, $message2, $message3, $message4, $message5]);
 
         $this->assertSame(5, $this->redis->zcard('test'));
@@ -398,7 +386,7 @@ class PoolTest extends BaseTestCase
         $this->assertTrue(in_array($message4Serialized, $items, true));
         $this->assertTrue(in_array($message5Serialized, $items, true));
 
-        $this->redis->zadd('test', [$message5Serialized => $time + 5]);
+        $this->redis->zadd('test', [$message5Serialized => self::TIME_MOCK + 5]);
 
         $items = $pool->getItems(3);
         $this->assertSame([$message1Serialized, $message2Serialized, $message3Serialized], $items);
@@ -412,11 +400,11 @@ class PoolTest extends BaseTestCase
         $pool->ackItems([$message2Serialized]);
 
         $this->assertSame(5, $this->redis->zcard('test'));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', $message1Serialized));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', $message2Serialized));
-        $this->assertSame($time + 129600, (int)$this->redis->zscore('test', $message3Serialized));
-        $this->assertSame(round($time + 600.1, 1), round($this->redis->zscore('test', $message4Serialized), 1));
-        $this->assertSame($time + 5, (int)$this->redis->zscore('test', $message5Serialized));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', $message1Serialized));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', $message2Serialized));
+        $this->assertSame(self::TIME_MOCK + 129600, (int)$this->redis->zscore('test', $message3Serialized));
+        $this->assertSame(round(self::TIME_MOCK + 600.1, 1), round($this->redis->zscore('test', $message4Serialized), 1));
+        $this->assertSame(self::TIME_MOCK + 5, (int)$this->redis->zscore('test', $message5Serialized));
 
         $pool->removeItem($message5);
 

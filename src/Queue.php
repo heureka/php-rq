@@ -34,11 +34,11 @@ class Queue extends Base
     /**
      * @inheritdoc
      */
-    public function __construct(ClientInterface $redis, $name, $options = [])
+    public function __construct(ClientInterface $redis, $name, $options = [], Time $time = null)
     {
-        parent::__construct($redis, $name, $options);
+        parent::__construct($redis, $name, $options, $time);
 
-        $this->clientID = sprintf('%s[%d][%d]', gethostname(), getmypid(), time());
+        $this->clientID = sprintf('%s[%d][%d]', gethostname(), getmypid(), $this->time->now());
     }
 
     /**
@@ -134,7 +134,7 @@ class Queue extends Base
                 $processingQueueName,
                 $timeoutsHashName,
                 $size,
-                microtime(true)
+                $this->time->micro()
             );
 
             $result = array_merge($result, $chunk);
@@ -163,7 +163,7 @@ class Queue extends Base
                 $processingQueueName,
                 $timeoutsHashName,
                 $this->options[self::OPT_GET_MAX_CHUNK_SIZE],
-                microtime(true)
+                $this->time->micro()
             );
             $result = array_merge($result, $chunk);
 
@@ -319,8 +319,9 @@ class Queue extends Base
 
         $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
         arsort($queues, SORT_NUMERIC);
+        $now = $this->time->now();
         foreach ($queues as $processingQueueName => $time) {
-            if ($time + $timeout < time()) {
+            if ($time + $timeout < $now) {
                 $this->redis->queueReEnqueue($this->name, $processingQueueName, $timeoutsHashName);
             }
         }
@@ -370,9 +371,10 @@ class Queue extends Base
         $timeoutsHashName = $this->getTimeoutsHashName();
 
         $queues = iterator_to_array(new HashKey($this->redis, $timeoutsHashName));
+        $now = $this->time->now();
         $pipe = $this->redis->pipeline();
         foreach ($queues as $processingQueueName => $time) {
-            if ($time + $timeout < time()) {
+            if ($time + $timeout < $now) {
                 $pipe->del($processingQueueName);
                 $pipe->hdel($timeoutsHashName, $processingQueueName);
             }

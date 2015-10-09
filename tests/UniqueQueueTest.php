@@ -108,8 +108,7 @@ class UniqueQueueTest extends BaseTestCase
         $this->redis->lpush('test', [1, 5, 3]);
         $this->redis->sadd('test-unique', [1, 5, 3]);
 
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
         $items = $queue->getItems(2);
         $this->assertSame(['1', '5'], $items);
@@ -120,7 +119,7 @@ class UniqueQueueTest extends BaseTestCase
         $items = $queue->getItems(2);
         $this->assertSame([], $items);
         $this->assertKeys([
-            sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time),
+            sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK),
             'test-timeouts',
         ]);
     }
@@ -148,8 +147,7 @@ class UniqueQueueTest extends BaseTestCase
         $this->redis->lpush('test', [1, 5, 3]);
         $this->redis->sadd('test-unique', [1, 5, 3]);
 
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
         $items = $queue->getAllItems();
         $this->assertSame(['1', '5', '3'], $items);
@@ -157,27 +155,25 @@ class UniqueQueueTest extends BaseTestCase
         $items = $queue->getAllItems();
         $this->assertSame([], $items);
         $this->assertKeys([
-            sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time),
+            sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK),
             'test-timeouts',
         ]);
     }
 
     public function testAckItem()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 3]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->ackItem(1);
         $queue->ackItem(3);
         $queue->ackItem(1);
 
         $this->assertSame(['5'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             $processingQueue,
             'test-timeouts'
@@ -190,19 +186,17 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testAckItems()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 3, 6, 7]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->ackItems([1, 3]);
         $queue->ackItems([1]);
 
         $this->assertSame(['7', '6', '5'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             $processingQueue,
             'test-timeouts'
@@ -216,13 +210,11 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testRejectItem()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 3]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->rejectItem(1);
         $queue->rejectItem(5);
@@ -236,7 +228,7 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertTrue(in_array('5', $items, true));
         $this->assertTrue(in_array('1', $items, true));
         $this->assertSame(['3'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             'test',
             'test-unique',
@@ -259,8 +251,7 @@ class UniqueQueueTest extends BaseTestCase
         ]);
 
         $this->redis->lpush($processingQueue, 1);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->rejectItem(1);
 
@@ -279,13 +270,11 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testRejectItems()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 3, 6, 7]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->rejectItems([1, 3]);
         $queue->rejectItems([1]);
@@ -299,7 +288,7 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertTrue(in_array('1', $items, true));
         $this->assertTrue(in_array('3', $items, true));
         $this->assertSame(['7', '6', '5'], $this->redis->lrange($processingQueue, 0, 5));
-        $this->assertSame([$processingQueue => (string)$uTime], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame([$processingQueue => (string)self::MICRO_TIME_MOCK], $this->redis->hgetall('test-timeouts'));
         $this->assertKeys([
             'test',
             'test-unique',
@@ -325,8 +314,7 @@ class UniqueQueueTest extends BaseTestCase
         ]);
 
         $this->redis->lpush($processingQueue, 1);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->rejectItems([1]);
 
@@ -348,13 +336,11 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testRejectBatch()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
         $this->redis->lpush($processingQueue, [1, 5, 3, 6, 7]);
-        $uTime = microtime(true);
-        $this->redis->hset('test-timeouts', $processingQueue, $uTime);
+        $this->redis->hset('test-timeouts', $processingQueue, self::MICRO_TIME_MOCK);
 
         $queue->ackItem(3);
         $queue->rejectBatch();
@@ -374,21 +360,19 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testReEnqueueTimedOutItems()
     {
-        $time = time();
-        $uTime = microtime(true);
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         $queue->reEnqueueTimedOutItems(7);
 
@@ -401,7 +385,10 @@ class UniqueQueueTest extends BaseTestCase
         $this->assertTrue(in_array('5', $items, true));
         $this->assertTrue(in_array('6', $items, true));
         $this->assertSame(['8', '7', '4'], $this->redis->lrange($processingQueue3, 0, 5));
-        $this->assertSame([$processingQueue3 => (string)($uTime - 5)], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame(
+            [$processingQueue3 => (string)(self::MICRO_TIME_MOCK - 5)],
+            $this->redis->hgetall('test-timeouts')
+        );
         $this->assertKeys([
             'test',
             'test-unique',
@@ -429,21 +416,19 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testReEnqueueAllItems()
     {
-        $time = time();
-        $uTime = microtime(true);
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         $queue->reEnqueueAllItems();
 
@@ -465,28 +450,29 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testDropTimedOutItems()
     {
-        $time = time();
-        $uTime = microtime(true);
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         $queue->dropTimedOutItems(7);
 
         $this->assertSame([], $this->redis->lrange('test', 0, 5));
         $this->assertSame([], $this->redis->smembers('test-unique'));
         $this->assertSame(['8', '7', '4'], $this->redis->lrange($processingQueue3, 0, 5));
-        $this->assertSame([$processingQueue3 => (string)($uTime - 5)], $this->redis->hgetall('test-timeouts'));
+        $this->assertSame(
+            [$processingQueue3 => (string)(self::MICRO_TIME_MOCK - 5)],
+            $this->redis->hgetall('test-timeouts')
+        );
         $this->assertKeys([
             'test-timeouts',
             $processingQueue3,
@@ -499,21 +485,19 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testDropAllItems()
     {
-        $time = time();
-        $uTime = microtime(true);
-        $queue = new UniqueQueue($this->redis, 'test');
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 5, 3]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [1, 4, 6]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
-        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 5);
+        $processingQueue3 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 5);
         $this->redis->lpush($processingQueue3, [4, 7, 8]);
-        $this->redis->hset('test-timeouts', $processingQueue3, $uTime - 5);
+        $this->redis->hset('test-timeouts', $processingQueue3, self::MICRO_TIME_MOCK - 5);
 
         $queue->dropAllItems();
 
@@ -522,20 +506,20 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testClearQueue()
     {
-        $time = time();
-        $uTime = microtime(true);
-        $queue = new UniqueQueue($this->redis, 'test', [UniqueQueue::OPT_DEL_MAX_CHUNK_SIZE => 2]);
+        $queue = new UniqueQueue($this->redis, 'test', [
+            UniqueQueue::OPT_DEL_MAX_CHUNK_SIZE => 2
+        ], $this->getTimeMock());
 
         $this->redis->lpush('test', [1, 5, 3]);
         $this->redis->sadd('test-unique', [1, 5, 3]);
 
-        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 15);
+        $processingQueue1 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 15);
         $this->redis->lpush($processingQueue1, [1, 8, 4]);
-        $this->redis->hset('test-timeouts', $processingQueue1, $uTime - 15);
+        $this->redis->hset('test-timeouts', $processingQueue1, self::MICRO_TIME_MOCK - 15);
 
-        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time - 10);
+        $processingQueue2 = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK - 10);
         $this->redis->lpush($processingQueue2, [2, 6, 7]);
-        $this->redis->hset('test-timeouts', $processingQueue2, $uTime - 10);
+        $this->redis->hset('test-timeouts', $processingQueue2, self::MICRO_TIME_MOCK - 10);
 
         $queue->clearQueue();
 
@@ -544,9 +528,8 @@ class UniqueQueueTest extends BaseTestCase
 
     public function testRealUseCaseExample1()
     {
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
 
         $queue->addItems([1, 2, 3, 1, 5, 6, 7]);
         $items = $queue->getItems(5);
@@ -628,9 +611,8 @@ class UniqueQueueTest extends BaseTestCase
         $message5->bool = true;
         $message5Serialized = serialize($message5);
 
-        $time = time();
-        $queue = new UniqueQueue($this->redis, 'test');
-        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), $time);
+        $queue = new UniqueQueue($this->redis, 'test', [], $this->getTimeMock());
+        $processingQueue = sprintf('test-processing-%s[%d][%d]', gethostname(), getmypid(), self::TIME_MOCK);
 
         $queue->addItems([$message1, $message2, $message3, $message1, $message4, $message5]);
         $items = $queue->getItems(4);
