@@ -50,7 +50,7 @@ class Pool extends Base
      */
     public function getCountToProcess()
     {
-        return $this->redis->zcount($this->name, '-inf', time());
+        return $this->redis->zcount($this->name, '-inf', $this->time->now());
     }
 
     /**
@@ -99,7 +99,7 @@ class Pool extends Base
             throw new Exception\InvalidArgument('$item mustn\'t be empty');
         }
 
-        $this->redis->zadd($this->name, time(), $item);
+        $this->redis->zadd($this->name, $this->time->now(), $item);
         $this->waitForSlaveSync();
     }
 
@@ -112,7 +112,7 @@ class Pool extends Base
      */
     public function addItems(array $items)
     {
-        $time = time();
+        $time = $this->time->now();
         $itemsToAdd = [];
         foreach ($items as $item) {
             $item = (string)$item;
@@ -155,7 +155,7 @@ class Pool extends Base
 
         $result = [];
         foreach ($steps as $size) {
-            $chunk = $this->redis->poolGet($this->name, $size, time(), $this->options[self::OPT_ACK_TTL]);
+            $chunk = $this->redis->poolGet($this->name, $size, $this->time->now(), $this->options[self::OPT_ACK_TTL]);
             $result = array_merge($result, $chunk);
             if (count($chunk) < count($size)) {
                 break;
@@ -177,7 +177,7 @@ class Pool extends Base
             $chunk = $this->redis->poolGet(
                 $this->name,
                 $this->options[self::OPT_GET_MAX_CHUNK_SIZE],
-                time(),
+                $this->time->now(),
                 $this->options[self::OPT_ACK_TTL]
             );
             $result = array_merge($result, $chunk);
@@ -214,7 +214,7 @@ class Pool extends Base
             try {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunk as $item) {
-                    $pipe->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+                    $pipe->poolAck($this->name, $item, $this->time->now() + $this->options[self::OPT_ACK_VALID_FOR]);
                 }
                 $pipe->execute();
                 $this->waitForSlaveSync();
@@ -317,7 +317,7 @@ class Pool extends Base
      */
     private function ackItemWithoutSync($item)
     {
-        $this->redis->poolAck($this->name, $item, time() + $this->options[self::OPT_ACK_VALID_FOR]);
+        $this->redis->poolAck($this->name, $item, $this->time->now() + $this->options[self::OPT_ACK_VALID_FOR]);
     }
 
     /**

@@ -36,13 +36,19 @@ abstract class Base
     protected $options;
 
     /**
+     * @var Time
+     */
+    protected $time;
+
+    /**
      * @param ClientInterface $redis
      * @param string          $name
      * @param array           $options
+     * @param Time|null       $time
      *
      * @throws Exception\UnknownOption
      */
-    public function __construct(ClientInterface $redis, $name, $options = [])
+    public function __construct(ClientInterface $redis, $name, $options = [], Time $time = null)
     {
         $this->redis = $redis;
         $this->name  = $name;
@@ -60,6 +66,8 @@ abstract class Base
 
             $this->options[$key] = $value;
         }
+
+        $this->time = $time ?: new Time();
     }
 
     abstract protected function setDefaultOptions();

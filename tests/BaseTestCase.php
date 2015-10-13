@@ -17,6 +17,16 @@ abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
 {
 
     /**
+     * @var int UNIX timestamp mock
+     */
+    const TIME_MOCK = 1444222459;
+
+    /**
+     * @var float UNIX timestamp + microseconds mock
+     */
+    const MICRO_TIME_MOCK = 1444222459.1847;
+
+    /**
      * @var ClientInterface
      */
     protected $redis;
@@ -28,6 +38,26 @@ abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
     public function __construct(ClientInterface $redis)
     {
         $this->redis = $redis;
+    }
+
+    /**
+     * @return Time|\Mockery\MockInterface
+     */
+    protected function getTimeMock()
+    {
+        $mock = \Mockery::mock('PhpRQ\Time');
+
+        $mock->shouldReceive('now')
+            ->zeroOrMoreTimes()
+            ->withNoArgs()
+            ->andReturn(self::TIME_MOCK);
+
+        $mock->shouldReceive('micro')
+            ->zeroOrMoreTimes()
+            ->withNoArgs()
+            ->andReturn(self::MICRO_TIME_MOCK);
+
+        return $mock;
     }
 
     /**
