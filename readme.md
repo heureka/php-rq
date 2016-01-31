@@ -4,6 +4,8 @@
 PhpRQ
 ======
 
+[![Join the chat at https://gitter.im/heureka/php-rq](https://badges.gitter.im/heureka/php-rq.svg)](https://gitter.im/heureka/php-rq?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 This library is set of php files and Lua scripts which enables you to easily implement queuing system based on Redis.
 The library is completely tested using integration tests (because of heavy usage of Lua scripts). There are multiple
 types of queues implemented in this library so you can choose the one that fits your needs best.
