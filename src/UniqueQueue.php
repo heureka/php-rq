@@ -21,6 +21,7 @@ class UniqueQueue extends Base
 
     const OPT_GET_MAX_CHUNK_SIZE        = 0;
     const OPT_DEL_MAX_CHUNK_SIZE        = 1;
+    const OPT_ADD_MAX_CHUNK_SIZE        = 6;
     const OPT_SET_SUFFIX                = 2;
     const OPT_PROCESSING_SUFFIX         = 3;
     const OPT_PROCESSING_TIMEOUT        = 4;
@@ -85,15 +86,18 @@ class UniqueQueue extends Base
         try {
             $setName = $this->getSetName();
 
-            $pipe = $this->redis->pipeline();
-            foreach ($items as $item) {
-                $item = (string)$item;
-                if (empty($item)) {
-                    throw new Exception\InvalidArgument('Items in $items mustn\'t be empty');
+            foreach (array_chunk($items, $this->options[self::OPT_ADD_MAX_CHUNK_SIZE]) as $chunkItems) {
+                $pipe = $this->redis->pipeline();
+                foreach ($chunkItems as $item) {
+                    $item = (string)$item;
+                    if (empty($item)) {
+                        throw new Exception\InvalidArgument('Items in $items mustn\'t be empty');
+                    }
+                    $pipe->uniqueQueueAdd($this->name, $setName, $item);
                 }
-                $pipe->uniqueQueueAdd($this->name, $setName, $item);
+                $pipe->execute();
             }
-            $pipe->execute();
+
             $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
@@ -452,6 +456,7 @@ class UniqueQueue extends Base
     protected function setDefaultOptions()
     {
         $this->options = [
+            self::OPT_ADD_MAX_CHUNK_SIZE         => 100,           // items count
             self::OPT_GET_MAX_CHUNK_SIZE         => 100,           // items count
             self::OPT_DEL_MAX_CHUNK_SIZE         => 1000,          // items count
             self::OPT_SET_SUFFIX                 => '-unique',     // string suffix
