@@ -217,7 +217,6 @@ class Pool extends Base
                     $pipe->poolAck($this->name, $item, $this->time->now() + $this->options[self::OPT_ACK_VALID_FOR]);
                 }
                 $pipe->execute();
-                $this->waitForSlaveSync();
             } catch (\Predis\Response\ServerException $e) {
                 if ($e->getErrorType() === 'NOSCRIPT') {
                     // this may happen once, when the script isn't loaded into server cache
@@ -237,6 +236,8 @@ class Pool extends Base
                 throw $e;
             }
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
