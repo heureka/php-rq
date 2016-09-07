@@ -210,32 +210,33 @@ class Pool extends Base
      */
     public function ackItems(array $items)
     {
-        foreach (array_chunk($items, $this->options[self::OPT_ACK_MAX_CHUNK_SIZE], true) as $chunk) {
-            try {
+        try {
+            foreach (array_chunk($items, $this->options[self::OPT_ACK_MAX_CHUNK_SIZE], true) as $chunk) {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunk as $item) {
                     $pipe->poolAck($this->name, $item, $this->time->now() + $this->options[self::OPT_ACK_VALID_FOR]);
                 }
                 $pipe->execute();
-                $this->waitForSlaveSync();
-            } catch (\Predis\Response\ServerException $e) {
-                if ($e->getErrorType() === 'NOSCRIPT') {
-                    // this may happen once, when the script isn't loaded into server cache
-                    // the following code will guarantee that the script is loaded and that this won't happen again
-                    $first = array_shift($items);
-                    $this->ackItemWithoutSync($first);
-                    if ($items) {
-                        $this->ackItems($items);
-                        return;
-                    }
+            }
 
-                    $this->waitForSlaveSync();
-
+            $this->waitForSlaveSync();
+        } catch (\Predis\Response\ServerException $e) {
+            if ($e->getErrorType() === 'NOSCRIPT') {
+                // this may happen once, when the script isn't loaded into server cache
+                // the following code will guarantee that the script is loaded and that this won't happen again
+                $first = array_shift($items);
+                $this->ackItemWithoutSync($first);
+                if ($items) {
+                    $this->ackItems($items);
                     return;
                 }
 
-                throw $e;
+                $this->waitForSlaveSync();
+
+                return;
             }
+
+            throw $e;
         }
     }
 
@@ -259,32 +260,33 @@ class Pool extends Base
      */
     public function removeItems($items)
     {
-        foreach (array_chunk($items, $this->options[self::OPT_DEL_MAX_CHUNK_SIZE], true) as $chunk) {
-            try {
+        try {
+            foreach (array_chunk($items, $this->options[self::OPT_DEL_MAX_CHUNK_SIZE], true) as $chunk) {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunk as $item) {
                     $pipe->poolRemove($this->name, $item);
                 }
                 $pipe->execute();
-                $this->waitForSlaveSync();
-            } catch (\Predis\Response\ServerException $e) {
-                if ($e->getErrorType() === 'NOSCRIPT') {
-                    // this may happen once, when the script isn't loaded into server cache
-                    // the following code will guarantee that the script is loaded and that this won't happen again
-                    $first = array_shift($items);
-                    $this->removeItemWithoutSync($first);
-                    if ($items) {
-                        $this->removeItems($items);
-                        return;
-                    }
+            }
 
-                    $this->waitForSlaveSync();
-
+            $this->waitForSlaveSync();
+        } catch (\Predis\Response\ServerException $e) {
+            if ($e->getErrorType() === 'NOSCRIPT') {
+                // this may happen once, when the script isn't loaded into server cache
+                // the following code will guarantee that the script is loaded and that this won't happen again
+                $first = array_shift($items);
+                $this->removeItemWithoutSync($first);
+                if ($items) {
+                    $this->removeItems($items);
                     return;
                 }
 
-                throw $e;
+                $this->waitForSlaveSync();
+
+                return;
             }
+
+            throw $e;
         }
     }
 
