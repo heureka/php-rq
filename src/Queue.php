@@ -196,11 +196,11 @@ class Queue extends Base
      */
     public function ackItems(array $items)
     {
+        $processingQueueName = $this->getProcessingQueueName();
+        $timeoutsHashName = $this->getTimeoutsHashName();
+
         try {
             foreach (array_chunk($items, $this->options[self::OPT_ACK_MAX_CHUNK_SIZE]) as $chunkItems) {
-                $processingQueueName = $this->getProcessingQueueName();
-                $timeoutsHashName    = $this->getTimeoutsHashName();
-
                 $pipe = $this->redis->pipeline();
                 foreach ($chunkItems as $item) {
                     $pipe->queueAck($processingQueueName, $timeoutsHashName, (string)$item);
