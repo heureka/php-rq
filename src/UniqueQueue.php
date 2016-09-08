@@ -22,6 +22,7 @@ class UniqueQueue extends Base
     const OPT_GET_MAX_CHUNK_SIZE        = 0;
     const OPT_DEL_MAX_CHUNK_SIZE        = 1;
     const OPT_ADD_MAX_CHUNK_SIZE        = 6;
+    const OPT_ACK_MAX_CHUNK_SIZE        = 7;
     const OPT_SET_SUFFIX                = 2;
     const OPT_PROCESSING_SUFFIX         = 3;
     const OPT_PROCESSING_TIMEOUT        = 4;
@@ -217,15 +218,18 @@ class UniqueQueue extends Base
      */
     public function ackItems(array $items)
     {
-        try {
-            $processingQueueName = $this->getProcessingQueueName();
-            $timeoutsHashName = $this->getTimeoutsHashName();
+        $processingQueueName = $this->getProcessingQueueName();
+        $timeoutsHashName = $this->getTimeoutsHashName();
 
-            $pipe = $this->redis->pipeline();
-            foreach ($items as $item) {
-                $pipe->uniqueQueueAck($processingQueueName, $timeoutsHashName, (string)$item);
+        try {
+            foreach (array_chunk($items, $this->options[self::OPT_ACK_MAX_CHUNK_SIZE]) as $chunkItems) {
+                $pipe = $this->redis->pipeline();
+                foreach ($chunkItems as $item) {
+                    $pipe->uniqueQueueAck($processingQueueName, $timeoutsHashName, (string)$item);
+                }
+                $pipe->execute();
             }
-            $pipe->execute();
+
             $this->waitForSlaveSync();
         } catch (\Predis\Response\ServerException $e) {
             if ($e->getErrorType() === 'NOSCRIPT') {
@@ -235,6 +239,7 @@ class UniqueQueue extends Base
                 $this->ackItemWithoutSync($first);
                 if ($items) {
                     $this->ackItems($items);
+
                     return;
                 }
 
@@ -457,6 +462,7 @@ class UniqueQueue extends Base
     {
         $this->options = [
             self::OPT_ADD_MAX_CHUNK_SIZE         => 100,           // items count
+            self::OPT_ACK_MAX_CHUNK_SIZE         => 100,           // items count
             self::OPT_GET_MAX_CHUNK_SIZE         => 100,           // items count
             self::OPT_DEL_MAX_CHUNK_SIZE         => 1000,          // items count
             self::OPT_SET_SUFFIX                 => '-unique',     // string suffix
