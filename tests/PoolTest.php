@@ -30,13 +30,38 @@ class PoolTest extends BaseTestCase
         $this->assertKeys(['test']);
     }
 
-    public function testGetCountToProcess()
+    /**
+     * @param int $processTimeOffset
+     * @param int $expectedCount
+     *
+     * @dataProvider providerGetCountToProcess
+     */
+    public function testGetCountToProcess($processTimeOffset, $expectedCount)
     {
-        $this->redis->zadd('test', [1 => self::TIME_MOCK - 5, 2 => self::TIME_MOCK - 3, 3 => self::TIME_MOCK + 5]);
-        $pool = new Pool($this->redis, 'test', [], $this->getTimeMock());
+        $this->redis->zadd('test', [
+            1 => self::TIME_MOCK - 10,
+            2 => self::TIME_MOCK - 5,
+            3 => self::TIME_MOCK - 3,
+            4 => self::TIME_MOCK,
+            5 => self::TIME_MOCK + 5,
+        ]);
+        $options = [Pool::OPT_PROCESS_TIME_OFFSET => $processTimeOffset];
+        $pool = new Pool($this->redis, 'test', $options, $this->getTimeMock());
 
-        $this->assertSame(2, $pool->getCountToProcess());
+        $this->assertSame($expectedCount, $pool->getCountToProcess());
         $this->assertKeys(['test']);
+    }
+
+    /**
+     * @return array
+     */
+    public function providerGetCountToProcess()
+    {
+        return [
+            [0, 4],
+            [4, 2],
+            [3, 3],
+        ];
     }
 
     public function testIsInPool()
@@ -147,6 +172,26 @@ class PoolTest extends BaseTestCase
         $this->assertKeys(['test']);
     }
 
+    public function testGetItemsWithNonZeroTimeOffset()
+    {
+        $this->redis->zadd('test', [
+            1 => self::TIME_MOCK - 5,
+            3 => self::TIME_MOCK - 2,
+            5 => self::TIME_MOCK,
+            7 => self::TIME_MOCK + 2,
+            9 => self::TIME_MOCK + 5,
+        ]);
+        $pool = new Pool($this->redis, 'test', [Pool::OPT_PROCESS_TIME_OFFSET => 2], $this->getTimeMock());
+
+        $items = $pool->getItems(2);
+        $this->assertSame(['1', '3'], $items);
+
+        $items = $pool->getItems(2);
+        $this->assertSame([], $items);
+
+        $this->assertKeys(['test']);
+    }
+
     /**
      * @dataProvider providerGetItemsInvalid
      */
@@ -177,6 +222,27 @@ class PoolTest extends BaseTestCase
 
         $items = $pool->getAllItems();
         $this->assertSame(['1', '3', '5', '7'], $items);
+
+        $items = $pool->getAllItems();
+        $this->assertSame([], $items);
+
+        $this->assertKeys(['test']);
+    }
+
+    public function testGetAllItemsWithNonZeroTimeOffset()
+    {
+        $this->redis->zadd('test', [
+            1  => self::TIME_MOCK - 10,
+            3  => self::TIME_MOCK - 5,
+            5  => self::TIME_MOCK - 2,
+            7  => self::TIME_MOCK - 1,
+            9  => self::TIME_MOCK,
+            11 => self::TIME_MOCK + 5,
+        ]);
+        $pool = new Pool($this->redis, 'test', [Pool::OPT_PROCESS_TIME_OFFSET => 2], $this->getTimeMock());
+
+        $items = $pool->getAllItems();
+        $this->assertSame(['1', '3', '5'], $items);
 
         $items = $pool->getAllItems();
         $this->assertSame([], $items);

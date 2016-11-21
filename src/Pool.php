@@ -17,12 +17,13 @@ use PhpRQ\Exception\InvalidArgument;
 class Pool extends Base
 {
 
-    const OPT_ADD_MAX_CHUNK_SIZE = 0;
-    const OPT_GET_MAX_CHUNK_SIZE = 1;
-    const OPT_ACK_MAX_CHUNK_SIZE = 2;
-    const OPT_DEL_MAX_CHUNK_SIZE = 3;
-    const OPT_ACK_TTL            = 4;
-    const OPT_ACK_VALID_FOR      = 5;
+    const OPT_ADD_MAX_CHUNK_SIZE  = 0;
+    const OPT_GET_MAX_CHUNK_SIZE  = 1;
+    const OPT_ACK_MAX_CHUNK_SIZE  = 2;
+    const OPT_DEL_MAX_CHUNK_SIZE  = 3;
+    const OPT_ACK_TTL             = 4;
+    const OPT_ACK_VALID_FOR       = 5;
+    const OPT_PROCESS_TIME_OFFSET = 6;
 
     /**
      * @deprecated @see Base::getName()
@@ -50,7 +51,9 @@ class Pool extends Base
      */
     public function getCountToProcess()
     {
-        return $this->redis->zcount($this->name, '-inf', $this->time->now());
+        $since = $this->time->now() - $this->options[self::OPT_PROCESS_TIME_OFFSET];
+
+        return $this->redis->zcount($this->name, '-inf', $since);
     }
 
     /**
@@ -155,7 +158,8 @@ class Pool extends Base
 
         $result = [];
         foreach ($steps as $size) {
-            $chunk = $this->redis->poolGet($this->name, $size, $this->time->now(), $this->options[self::OPT_ACK_TTL]);
+            $since = $this->time->now() - $this->options[self::OPT_PROCESS_TIME_OFFSET];
+            $chunk = $this->redis->poolGet($this->name, $size, $since, $this->options[self::OPT_ACK_TTL]);
             $result = array_merge($result, $chunk);
             if (count($chunk) < count($size)) {
                 break;
@@ -177,7 +181,7 @@ class Pool extends Base
             $chunk = $this->redis->poolGet(
                 $this->name,
                 $this->options[self::OPT_GET_MAX_CHUNK_SIZE],
-                $this->time->now(),
+                $this->time->now() - $this->options[self::OPT_PROCESS_TIME_OFFSET],
                 $this->options[self::OPT_ACK_TTL]
             );
             $result = array_merge($result, $chunk);
@@ -305,12 +309,13 @@ class Pool extends Base
     protected function setDefaultOptions()
     {
         $this->options = [
-            self::OPT_ADD_MAX_CHUNK_SIZE => 100,    // items count
-            self::OPT_GET_MAX_CHUNK_SIZE => 100,    // items count
-            self::OPT_ACK_MAX_CHUNK_SIZE => 500,    // items count
-            self::OPT_DEL_MAX_CHUNK_SIZE => 100,    // items count
-            self::OPT_ACK_TTL            => 600,    // seconds
-            self::OPT_ACK_VALID_FOR      => 129600, // seconds
+            self::OPT_ADD_MAX_CHUNK_SIZE  => 100,    // items count
+            self::OPT_GET_MAX_CHUNK_SIZE  => 100,    // items count
+            self::OPT_ACK_MAX_CHUNK_SIZE  => 500,    // items count
+            self::OPT_DEL_MAX_CHUNK_SIZE  => 100,    // items count
+            self::OPT_ACK_TTL             => 600,    // seconds
+            self::OPT_ACK_VALID_FOR       => 129600, // seconds
+            self::OPT_PROCESS_TIME_OFFSET => 0,      // seconds
         ];
     }
 
