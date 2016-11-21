@@ -42,8 +42,21 @@ class TestRunner
                     continue;
                 }
 
-                $testCase = new $className($this->provider->getRedisClient());
-                $testCase->$methodName();
+                $phpdoc = $method->getDocComment();
+                if ($phpdoc !== false && ($providerPos = strpos($phpdoc, '@dataProvider')) !== false) {
+                    $providerMethodPos = $providerPos + 14;
+                    $providerMethodLen = strpos($phpdoc, "\n", $providerMethodPos) - $providerMethodPos;
+                    $providerMethod = substr($phpdoc, $providerMethodPos, $providerMethodLen);
+
+                    $testCase = new $className($this->provider->getRedisClient());
+                    foreach ($testCase->$providerMethod() as $args) {
+                        $testCase = new $className($this->provider->getRedisClient());
+                        call_user_func_array([$testCase, $methodName], (array)$args);
+                    }
+                } else {
+                    $testCase = new $className($this->provider->getRedisClient());
+                    $testCase->$methodName();
+                }
             }
         }
     }
