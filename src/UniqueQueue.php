@@ -84,10 +84,10 @@ class UniqueQueue extends Base
      */
     public function addItems(array $items)
     {
-        try {
-            $setName = $this->getSetName();
+        foreach (array_chunk($items, $this->options[self::OPT_ADD_MAX_CHUNK_SIZE]) as $chunkItems) {
+            try {
+                $setName = $this->getSetName();
 
-            foreach (array_chunk($items, $this->options[self::OPT_ADD_MAX_CHUNK_SIZE]) as $chunkItems) {
                 $pipe = $this->redis->pipeline();
                 foreach ($chunkItems as $item) {
                     $item = (string)$item;
@@ -97,27 +97,27 @@ class UniqueQueue extends Base
                     $pipe->uniqueQueueAdd($this->name, $setName, $item);
                 }
                 $pipe->execute();
-            }
+            } catch (\Predis\Response\ServerException $e) {
+                if ($e->getErrorType() === 'NOSCRIPT') {
+                    // this may happen once, when the script isn't loaded into server cache
+                    // the following code will guarantee that the script is loaded and that this won't happen again
+                    $first = array_shift($items);
+                    $this->addItemWithoutSync($first);
+                    if ($items) {
+                        $this->addItems($items);
+                        return;
+                    }
 
-            $this->waitForSlaveSync();
-        } catch (\Predis\Response\ServerException $e) {
-            if ($e->getErrorType() === 'NOSCRIPT') {
-                // this may happen once, when the script isn't loaded into server cache
-                // the following code will guarantee that the script is loaded and that this won't happen again
-                $first = array_shift($items);
-                $this->addItemWithoutSync($first);
-                if ($items) {
-                    $this->addItems($items);
+                    $this->waitForSlaveSync();
+
                     return;
                 }
 
-                $this->waitForSlaveSync();
-
-                return;
+                throw $e;
             }
-
-            throw $e;
         }
+
+        $this->waitForSlaveSync();
     }
 
     /**
