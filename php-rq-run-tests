@@ -37,5 +37,5 @@ try {
 
 \PhpRQ\PhpRQTest::$redis = $redis;
 
-$phpUnit = new PHPUnit_TextUI_Command;
+$phpUnit = new \PHPUnit\TextUI\Command;
 $phpUnit->run([__FILE__, 'PhpRQ\PhpRQTest', __DIR__ . '/tests/PhpRQTest.php']);

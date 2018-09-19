@@ -13,7 +13,7 @@ use Predis\Collection\Iterator\Keyspace;
  *
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
+abstract class BaseTestCase extends \PHPUnit\Framework\TestCase
 {
 
     /**
