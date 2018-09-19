@@ -5,7 +5,7 @@ namespace PhpRQ;
 /**
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class PhpRQTest extends \PHPUnit_Framework_TestCase
+class PhpRQTest extends \PHPUnit\Framework\TestCase
 {
 
     /**

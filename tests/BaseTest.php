@@ -7,7 +7,7 @@ use Mockery;
 /**
  * @author Jakub Chábek <jakub.chabek@heureka.cz>
  */
-class BaseTest extends \PHPUnit_Framework_TestCase
+class BaseTest extends \PHPUnit\Framework\TestCase
 {
 
     public function testDefaultOptionsWereSet()
