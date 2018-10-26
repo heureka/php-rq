@@ -444,3 +444,31 @@ Pool::clearPool
 ---------------
 
 Removes all the items from the pool. Useful for testing purposes.
+
+
+Base
+===========
+-----------
+
+This functionality is implemented in the abstract class `Base` therefore 
+you can call it from all object types in the library (like Queue, Pool,..).
+
+safeExecution()
+---------------------
+
+Functional wrapper for retrying call of a PhpRQ method to avoid raising Predis\Connection\ConnectionException 
+in case of a packet loss.
+
+Example:
+
+```php
+$queue = new \PhpRQ\Queue($predisConnection);
+
+$items = $queue->safeExecution(
+    function() use ($queue) {$queue->getItems(1);},
+    function($returnValue) { /* what should happen in case of success */ },
+    function() { /* what should happen in case of failure */ },
+    $retryWait,  // Microseconds to wait between retries.
+    $maxAttempts // Maximal count of attempts.
+);
+```

@@ -15,6 +15,13 @@ abstract class Base
     const OPT_SLAVES_SYNC_REQUIRED_COUNT = -2;
     const OPT_SLAVES_SYNC_TIMEOUT        = -3;
 
+
+    /** Microseconds to wait between retries. Will use exponential backoff @see the line 37 */
+    const DEFAULT_RETRY_WAIT = 100;
+
+    /** Maximal count of attempts */
+    const DEFAULT_MAX_ATTEMPTS = 10;
+
     /**
      * @var ClientInterface
      */
@@ -112,6 +119,50 @@ abstract class Base
     public function getName()
     {
         return $this->name;
+    }
+
+    /**
+     * Functional wrapper for retrying call of a PhpRQ method to avoid raising Predis\Connection\ConnectionException
+     * in case of a packet loss.
+     *
+     * @param callable      $callback        Callback which will be executed.
+     * @param callable|null $successCallback Called only if the callback call has been successful.
+     * @param callable|null $failureCallback Called only if the callback call has failed
+     * @param int           $maxAttempts     Maximal count of attempts.
+     * @param int           $retryWait       Microseconds to wait between retries.
+     *
+     * @return mixed Return value from injected callable function
+     *
+     * @throws \Predis\Connection\ConnectionException
+     */
+    public function safeExecution(
+        callable $callback,
+        callable $successCallback = null,
+        callable $failureCallback = null,
+        $maxAttempts=self::DEFAULT_MAX_ATTEMPTS,
+        $retryWait=self::DEFAULT_RETRY_WAIT
+    ) {
+        $retries = 0;
+        do {
+            try {
+                $returnValue = call_user_func($callback, $this);
+                if ($successCallback !== null) {
+                    $successCallback($returnValue);
+                }
+                return $returnValue;
+                break;
+            } catch (\Predis\Connection\ConnectionException $exception) {
+                if ($failureCallback !== null) {
+                    $failureCallback();
+                }
+                usleep($retryWait * $retries ** 2);
+            }
+
+            $retries++;
+
+        } while ($retries < $maxAttempts);
+
+        throw $exception;
     }
 
 }
