@@ -94,6 +94,60 @@ class BaseTest extends \PHPUnit\Framework\TestCase
         Mockery::close();
     }
 
+    public function testSafeExecutionSuccesful()
+    {
+        $queue = new TestQueueImplementation($this->getRedisMock(), 'test');
+
+        $testValue = 'whateva';
+
+        $assertMock = \Mockery::mock();
+        $assertMock->shouldReceive('success')->once();
+        $assertMock->shouldReceive('fail')->never();
+
+        $this->assertSame(
+            $testValue,
+            $queue->safeExecution(function($queue) use($testValue) {return $testValue;}),
+            function($returnValue) use ($testValue, $assertMock) {
+                $this->assertSame($testValue, $returnValue);
+                $assertMock->success();
+            },
+            function() use ($assertMock){$assertMock->fail();}
+        );
+    }
+
+    public function testSafeExecution2retries()
+    {
+        $queue = new TestQueueImplementation($this->getRedisMock(), 'test');
+
+        $assertMock = \Mockery::mock();
+        $assertMock->shouldReceive('success')->once();
+        $assertMock->shouldReceive('fail')->twice();
+
+        $this->assertSame(5, $queue->safeExecution(
+            function($queue) {return $queue->raise2timesException();},
+            function() use ($assertMock) {$assertMock->success();},
+            function() use ($assertMock) {$assertMock->fail();}
+        ));
+    }
+
+    public function testSafeExecutionAllRetriesFail()
+    {
+        $queue = new TestQueueImplementation($this->getRedisMock(), 'test');
+
+        $assertMock = \Mockery::mock();
+        $assertMock->shouldReceive('success')->never();
+        $assertMock->shouldReceive('fail')->once();
+
+        try {
+            $queue->safeExecution(
+                function($queue) {return $queue->raiseAllwaysException();},
+                function() use ($assertMock) {$assertMock->success();},
+                function() use ($assertMock) {$assertMock->fail();}
+            );
+            $this->fail('The ConnectionException should have been raised.');
+        } catch (\Predis\Connection\ConnectionException $e) {}
+    }
+
     /**
      * @return Mockery\Mock|ClientInterface
      */
@@ -125,6 +179,26 @@ class TestQueueImplementation extends Base
     public function testWaitForSlaveSync()
     {
         $this->waitForSlaveSync();
+    }
+
+    public function raiseAllwaysException()
+    {
+        $connectionInterface = \Mockery::mock(\Predis\Connection\NodeConnectionInterface::class);
+        throw new \Predis\Connection\ConnectionException($connectionInterface, 'test');
+    }
+
+    private $errorCounter = 0;
+
+    public function raise2timesException()
+    {
+        $connectionInterface = \Mockery::mock(\Predis\Connection\NodeConnectionInterface::class);
+
+        $this->errorCounter++;
+        if ($this->errorCounter < 2) {
+            throw new \Predis\Connection\ConnectionException($connectionInterface, 'test');
+        } else {
+            return 5;
+        }
     }
 
 }
