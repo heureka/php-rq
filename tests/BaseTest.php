@@ -106,13 +106,17 @@ class BaseTest extends \PHPUnit\Framework\TestCase
 
         $this->assertSame(
             $testValue,
-            $queue->safeExecution(function($queue) use($testValue) {return $testValue;}),
-            function($returnValue) use ($testValue, $assertMock) {
-                $this->assertSame($testValue, $returnValue);
-                $assertMock->success();
-            },
-            function() use ($assertMock){$assertMock->fail();}
+            $queue->safeExecution(
+                function($queue) use($testValue) {return $testValue;},
+                function($returnValue) use ($testValue, $assertMock) {
+                    $this->assertSame($testValue, $returnValue);
+                    $assertMock->success();
+                },
+                function() use ($assertMock){$assertMock->fail();}
+            )
         );
+
+        Mockery::close();
     }
 
     public function testSafeExecution2retries()
@@ -128,6 +132,8 @@ class BaseTest extends \PHPUnit\Framework\TestCase
             function() use ($assertMock) {$assertMock->success();},
             function() use ($assertMock) {$assertMock->fail();}
         ));
+
+        Mockery::close();
     }
 
     public function testSafeExecutionAllRetriesFail()
@@ -142,10 +148,13 @@ class BaseTest extends \PHPUnit\Framework\TestCase
             $queue->safeExecution(
                 function($queue) {return $queue->raiseAllwaysException();},
                 function() use ($assertMock) {$assertMock->success();},
-                function() use ($assertMock) {$assertMock->fail();}
+                function() use ($assertMock) {$assertMock->fail();},
+                1
             );
             $this->fail('The ConnectionException should have been raised.');
         } catch (\Predis\Connection\ConnectionException $e) {}
+
+        Mockery::close();
     }
 
     /**
@@ -194,7 +203,7 @@ class TestQueueImplementation extends Base
         $connectionInterface = \Mockery::mock(\Predis\Connection\NodeConnectionInterface::class);
 
         $this->errorCounter++;
-        if ($this->errorCounter < 2) {
+        if ($this->errorCounter < 3) {
             throw new \Predis\Connection\ConnectionException($connectionInterface, 'test');
         } else {
             return 5;
