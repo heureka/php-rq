@@ -37,6 +37,8 @@ abstract class BaseTestCase extends \PHPUnit\Framework\TestCase
      */
     public function __construct(ClientInterface $redis)
     {
+        parent::__construct();
+
         $this->redis = $redis;
     }
 

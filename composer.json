@@ -12,16 +12,16 @@
         }
     ],
     "require": {
-        "php": ">=7.0.0",
-        "predis/predis": "~1.1.1"
+        "php": ">=7.1.0",
+        "predis/predis": "1.1.x-dev#157f658f0be5f48cb2aaa4b6a6ac753c1168f465"
     },
     "bin": [
         "php-rq-run-tests"
     ],
     "require-dev": {
-        "phpunit/phpunit": "~6.5.13",
-        "mockery/mockery": "~0.9.4",
-        "nette/finder": "~2.4"
+        "phpunit/phpunit": "~7.5.15",
+        "mockery/mockery": "~1.2.3",
+        "nette/finder": "~2.5"
     },
     "autoload": {
         "psr-4": {
