@@ -161,7 +161,7 @@ class Pool extends Base
             $since = $this->time->now() - $this->options[self::OPT_PROCESS_TIME_OFFSET];
             $chunk = $this->redis->poolGet($this->name, $size, $since, $this->options[self::OPT_ACK_TTL]);
             $result = array_merge($result, $chunk);
-            if (count($chunk) < count($size)) {
+            if (count($chunk) < $size) {
                 break;
             }
         }

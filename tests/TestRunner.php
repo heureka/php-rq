@@ -54,7 +54,12 @@ class TestRunner
                         call_user_func_array([$testCase, $methodName], (array)$args);
                     }
                 } else {
-                    $testCase = new $className($this->provider->getRedisClient());
+                    if ($className === 'PhpRQ\\BaseTest') {
+                        $testCase = new $className();
+                    } else {
+                        $testCase = new $className($this->provider->getRedisClient());
+                    }
+
                     $testCase->$methodName();
                 }
             }
