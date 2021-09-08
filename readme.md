@@ -1,4 +1,4 @@
-[![Travis CI](https://img.shields.io/travis/heureka/php-rq.svg)](https://travis-ci.org/heureka/php-rq)
+[![workflows](https://github.com/heureka/php-rq/workflows/ci/badge.svg)](https://github.com/heureka/php-rq/actions)
 [![Packagist](https://img.shields.io/packagist/v/heureka/php-rq.svg)](https://packagist.org/packages/heureka/php-rq)
 [![Join the chat at https://gitter.im/heureka/php-rq](https://badges.gitter.im/heureka/php-rq.svg)](https://gitter.im/heureka/php-rq)
 
