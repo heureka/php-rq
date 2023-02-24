@@ -1,0 +1,20 @@
+version: '3'
+services:
+  php-rq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ''
+    command: sh -c 'php php-rq-run-tests'
+    volumes:
+      - ./:/app
+    environment:
+      REDIS_HOST: redis
+      REDIS_DB: 0
+      REDIS_PORT: 6379
+      REDIS_PASSWORD:
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7.0.8-alpine
