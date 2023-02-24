@@ -13,7 +13,7 @@
     ],
     "require": {
         "php": ">=7.1.0",
-        "predis/predis": "1.1.x-dev#157f658f0be5f48cb2aaa4b6a6ac753c1168f465"
+        "predis/predis": "1.1.10"
     },
     "bin": [
         "php-rq-run-tests"
