@@ -12,8 +12,8 @@
         }
     ],
     "require": {
-        "php": ">=7.1.0",
-        "predis/predis": "1.1.10"
+        "php": ">=7.3.0",
+        "predis/predis": "2.0.0"
     },
     "bin": [
         "php-rq-run-tests"
