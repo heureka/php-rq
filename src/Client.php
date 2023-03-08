@@ -27,7 +27,7 @@ class Client extends \Predis\Client implements ClientInterface
      */
     public function __construct($parameters = null, $options = null)
     {
-        $newCommands = [
+        $commands = [
             'commands' => [
                 'queueGet'             => 'PhpRQ\Command\Queue\Get',
                 'queueAck'             => 'PhpRQ\Command\Queue\Ack',
@@ -44,7 +44,7 @@ class Client extends \Predis\Client implements ClientInterface
                 'wait'                 => 'PhpRQ\Command\Wait',
             ],
         ];
-        $options = $options ? array_merge($options, $newCommands) : $newCommands;
+        $options = $options ? array_merge($options, $commands) : $commands;
 
         parent::__construct($parameters, $options);
     }
