@@ -27,27 +27,26 @@ class Client extends \Predis\Client implements ClientInterface
      */
     public function __construct($parameters = null, $options = null)
     {
+        $newCommands = [
+            'commands' => [
+                'queueGet'             => 'PhpRQ\Command\Queue\Get',
+                'queueAck'             => 'PhpRQ\Command\Queue\Ack',
+                'queueReject'          => 'PhpRQ\Command\Queue\Reject',
+                'queueReEnqueue'       => 'PhpRQ\Command\Queue\ReEnqueue',
+                'uniqueQueueAdd'       => 'PhpRQ\Command\UniqueQueue\Add',
+                'uniqueQueueGet'       => 'PhpRQ\Command\UniqueQueue\Get',
+                'uniqueQueueAck'       => 'PhpRQ\Command\UniqueQueue\Ack',
+                'uniqueQueueReject'    => 'PhpRQ\Command\UniqueQueue\Reject',
+                'uniqueQueueReEnqueue' => 'PhpRQ\Command\UniqueQueue\ReEnqueue',
+                'poolGet'              => 'PhpRQ\Command\Pool\Get',
+                'poolAck'              => 'PhpRQ\Command\Pool\Ack',
+                'poolRemove'           => 'PhpRQ\Command\Pool\Remove',
+                'wait'                 => 'PhpRQ\Command\Wait',
+            ],
+        ];
+        $options = $options ? array_merge($options, $newCommands) : $newCommands;
+
         parent::__construct($parameters, $options);
-
-        /** @var \Predis\Profile\RedisProfile $profile */
-        $profile = $this->getProfile();
-
-        $profile->defineCommand('queueGet', 'PhpRQ\Command\Queue\Get');
-        $profile->defineCommand('queueAck', 'PhpRQ\Command\Queue\Ack');
-        $profile->defineCommand('queueReject', 'PhpRQ\Command\Queue\Reject');
-        $profile->defineCommand('queueReEnqueue', 'PhpRQ\Command\Queue\ReEnqueue');
-
-        $profile->defineCommand('uniqueQueueAdd', 'PhpRQ\Command\UniqueQueue\Add');
-        $profile->defineCommand('uniqueQueueGet', 'PhpRQ\Command\UniqueQueue\Get');
-        $profile->defineCommand('uniqueQueueAck', 'PhpRQ\Command\UniqueQueue\Ack');
-        $profile->defineCommand('uniqueQueueReject', 'PhpRQ\Command\UniqueQueue\Reject');
-        $profile->defineCommand('uniqueQueueReEnqueue', 'PhpRQ\Command\UniqueQueue\ReEnqueue');
-
-        $profile->defineCommand('poolGet', 'PhpRQ\Command\Pool\Get');
-        $profile->defineCommand('poolAck', 'PhpRQ\Command\Pool\Ack');
-        $profile->defineCommand('poolRemove', 'PhpRQ\Command\Pool\Remove');
-
-        $profile->defineCommand('wait', 'PhpRQ\Command\Wait');
     }
 
     /**
